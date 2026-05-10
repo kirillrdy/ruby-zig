@@ -48,6 +48,13 @@
 #define HAVE_CLOCK_GETRES 1
 #define HAVE_CLOCK_SETTIME 1
 #define HAVE_ASSERT_H 1
+#define HAVE_STRCHR 1
+#define HAVE_STRRCHR 1
+#define HAVE_STRSTR 1
+
+#undef __LZCNT__
+#undef __BMI__
+#undef __BMI2__
 
 #define __EXTENSIONS__ 1
 #define _ALL_SOURCE 1
@@ -209,7 +216,9 @@
 #define PRI_PIDT_PREFIX ""
 #define PRI_SIZE_PREFIX "z"
 
+#ifndef COROUTINE_H
 #define COROUTINE_H "coroutine/arm64/Context.h"
+#endif
 #ifndef RUBY_JMP_BUF
 #define RUBY_JMP_BUF jmp_buf
 #endif
@@ -260,6 +269,15 @@ typedef unsigned long unsigned_clock_t;
 #define is_power_of_two(x) (((x) & ((x) - 1)) == 0)
 #endif
 
+#ifdef __APPLE__
 #define HAVE_STRUCT_STAT_ST_ATIMESPEC 1
+#define HAVE_STRUCT_STAT_ST_MTIMESPEC 1
+#define HAVE_STRUCT_STAT_ST_CTIMESPEC 1
+#else
+#define HAVE_STRUCT_STAT_ST_ATIM 1
+#define HAVE_STRUCT_STAT_ST_MTIM 1
+#define HAVE_STRUCT_STAT_ST_CTIM 1
+#define HAVE_MEMRCHR 1
+#endif
 
 #endif
