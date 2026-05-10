@@ -1,0 +1,227 @@
+#ifndef RUBY_CONFIG_H
+#define RUBY_CONFIG_H 1
+
+#define STDC_HEADERS 1
+#define HAVE_SYS_TYPES_H 1
+#define HAVE_SYS_STAT_H 1
+#define HAVE_STDLIB_H 1
+#define HAVE_STRING_H 1
+#define HAVE_MEMORY_H 1
+#define HAVE_STRINGS_H 1
+#define HAVE_INTTYPES_H 1
+#define HAVE_STDINT_H 1
+#define HAVE_UNISTD_H 1
+#define HAVE_LIMITS_H 1
+#define HAVE_SYS_LIMITS_H 1
+#define HAVE_FLOAT_H 1
+#define HAVE_FCNTL_H 1
+#define HAVE_SYS_FCNTL_H 1
+#define HAVE_SYS_IOCTL_H 1
+#define HAVE_SYS_PARAM_H 1
+#define HAVE_SYS_SELECT_H 1
+#define HAVE_SYS_TIME_H 1
+#define HAVE_SYS_TIMES_H 1
+#define HAVE_SYS_UIO_H 1
+#define HAVE_SYS_WAIT_H 1
+#define HAVE_TIME_H 1
+#define HAVE_UTIME_H 1
+#define HAVE_DIRENT_H 1
+#define HAVE_SYS_RESOURCE_H 1
+#define HAVE_SYS_SOCKET_H 1
+#define HAVE_NETINET_IN_H 1
+#define HAVE_ARPA_INET_H 1
+#define HAVE_NETDB_H 1
+#define HAVE_SETJMP_H 1
+#define HAVE_SIGNAL_H 1
+#define HAVE_PTHREAD_H 1
+#define HAVE_STDBOOL_H 1
+#define HAVE__BOOL 1
+#define HAVE_POLL_H 1
+#define HAVE_POLL 1
+#define HAVE_CLOCK_GETTIME 1
+#define HAVE_CLOCK_GETRES 1
+#define HAVE_CLOCK_SETTIME 1
+#define HAVE_ASSERT_H 1
+
+#define __EXTENSIONS__ 1
+#define _ALL_SOURCE 1
+#define _DARWIN_C_SOURCE 1
+#define _GNU_SOURCE 1
+#define _POSIX_PTHREAD_SEMANTICS 1
+#define _TANDEM_SOURCE 1
+
+#define HAVE_LONG_LONG 1
+#define HAVE_OFF_T 1
+#define rb_off_t off_t
+#define rb_pid_t pid_t
+#define rb_uid_t uid_t
+#define rb_gid_t gid_t
+#define rb_mode_t mode_t
+
+#define SIZEOF_INT 4
+#define SIZEOF_SHORT 2
+#define SIZEOF_LONG 8
+#define SIZEOF_LONG_LONG 8
+#define SIZEOF_VOIDP 8
+#define SIZEOF_VOID_P 8
+#define SIZEOF_SIZE_T 8
+#define SIZEOF_TIME_T 8
+#define SIZEOF_UINTPTR_T 8
+#define SIZEOF_OFF_T 8
+
+#define HAVE_PROTOTYPES 1
+#ifndef TOKEN_PASTE
+#define TOKEN_PASTE(x,y) x##y
+#endif
+#define HAVE_STDARG_PROTOTYPES 1
+#define HAVE_VOLATILE 1
+#define HAVE_TYPEOF 1
+#define HAVE_STRUCT_TIMEVAL 1
+#define HAVE_STRUCT_TIMESPEC 1
+#define HAVE_STRUCT_TIMEZONE 1
+#define HAVE_STRUCT_STAT_ST_BLKSIZE 1
+#define HAVE_STRUCT_STAT_ST_BLOCKS 1
+#define HAVE_STRUCT_STAT_ST_RDEV 1
+#define HAVE_GETTIMEOFDAY 1
+#define HAVE_SETTIMEOFDAY 1
+#define HAVE_MEMMOVE 1
+#define HAVE_STRLCPY 1
+#define HAVE_STRLCAT 1
+#define HAVE_UMASK 1
+#define HAVE_CHMOD 1
+#define HAVE_CHOWN 1
+#define HAVE_LCHOWN 1
+#define HAVE_FCHOWN 1
+#define HAVE_FCHMOD 1
+#define HAVE_FSTAT 1
+#define HAVE_LSTAT 1
+#define HAVE_LINK 1
+#define HAVE_SYMLINK 1
+#define HAVE_READLINK 1
+#define HAVE_REALPATH 1
+#define HAVE_GETEUID 1
+#define HAVE_GETUID 1
+#define HAVE_GETEGID 1
+#define HAVE_GETGID 1
+#define HAVE_GETPPID 1
+#define HAVE_GETPGRP 1
+#define HAVE_SETPGRP 1
+#define HAVE_GETPGID 1
+#define HAVE_SETPGID 1
+#define HAVE_GETSID 1
+#define HAVE_SETSID 1
+#define HAVE_GETPRIORITY 1
+#define HAVE_SETPRIORITY 1
+#define HAVE_GETRLIMIT 1
+#define HAVE_SETRLIMIT 1
+#define HAVE_GETRUSAGE 1
+#define HAVE_GETCWD 1
+#define HAVE_CHDIR 1
+#define HAVE_CHROOT 1
+#define HAVE_MKDIR 1
+#define HAVE_RMDIR 1
+#define HAVE_UNLINK 1
+#define HAVE_RENAME 1
+#define HAVE_TRUNCATE 1
+#define HAVE_FTRUNCATE 1
+#define HAVE_FSEEKO 1
+#define HAVE_FTELLO 1
+#define HAVE_FCLOSE 1
+#define HAVE_FOPEN 1
+#define HAVE_FDOPEN 1
+#define HAVE_FILENO 1
+#define HAVE_FERROR 1
+#define HAVE_FEOF 1
+#define HAVE_FGETS 1
+#define HAVE_FPUTS 1
+#define HAVE_FREAD 1
+#define HAVE_FWRITE 1
+#define HAVE_FPRINTF 1
+#define HAVE_FSCANF 1
+#define HAVE_REWIND 1
+#define HAVE_SETVBUF 1
+#define HAVE_SETBUF 1
+
+#define UID_T uid_t
+#define GID_T gid_t
+#define GETGROUPS_T gid_t
+
+#define HAVE_ATTRIBUTE_NORETURN 1
+#define HAVE_ATTRIBUTE_CONST 1
+#define HAVE_ATTRIBUTE_PURE 1
+#define HAVE_ATTRIBUTE_UNUSED 1
+#define HAVE_ATTRIBUTE_MALLOC 1
+#define HAVE_ATTRIBUTE_WARN_UNUSED_RESULT 1
+#define HAVE_ATTRIBUTE_DEPRECATED 1
+#define HAVE_ATTRIBUTE_ERROR 1
+#define HAVE_ATTRIBUTE_WARNING 1
+
+#define HAVE_BUILTIN_CHOOSE_EXPR 1
+#define HAVE_BUILTIN_TYPES_COMPATIBLE_P 1
+#define HAVE_BUILTIN_EXPECT 1
+#define HAVE_BUILTIN_FRAME_ADDRESS 1
+#define HAVE_BUILTIN_CLZ 1
+#define HAVE_BUILTIN_CLZL 1
+#define HAVE_BUILTIN_CLZLL 1
+#define HAVE_BUILTIN_CTZ 1
+#define HAVE_BUILTIN_CONSTANT_P 1
+#define HAVE_BUILTIN_ALLOCA_WITH_ALIGN 1
+#define HAVE_BUILTIN_ASSUME_ALIGNED 1
+#define HAVE_BUILTIN_BSWAP16 1
+#define HAVE_BUILTIN_BSWAP32 1
+#define HAVE_BUILTIN_BSWAP64 1
+#define HAVE_BUILTIN_POPCOUNT 1
+#define HAVE_BUILTIN_POPCOUNTL 1
+#define HAVE_BUILTIN_POPCOUNTLL 1
+#define HAVE_BUILTIN_MEMCPY_INLINE 1
+#define HAVE_BUILTIN_UNREACHABLE 1
+#define HAVE_BUILTIN_ADD_OVERFLOW 1
+#define HAVE_BUILTIN_SUB_OVERFLOW 1
+#define HAVE_BUILTIN_MUL_OVERFLOW 1
+
+#define HAVE_VA_ARGS_MACRO 1
+#define HAVE_STMT_AND_DECL_IN_EXPR 1
+
+#define HAVE_LIBPTHREAD 1
+#define THREAD_IMPL_H "thread_pthread.h"
+#define THREAD_IMPL_SRC "thread_pthread.c"
+
+#define RUBY_PLATFORM "arm64-darwin"
+#define RUBY_ARCH "arm64-darwin"
+
+#define HAVE_BACKTRACE 1
+#define HAVE_GCC_ATOMIC_BUILTINS 1
+#define HAVE_GCC_SYNC_BUILTINS 1
+#define HAVE_STDATOMIC_H 1
+#define HAVE_SCHED_H 1
+
+#define PRI_PTRDIFF_PREFIX "l"
+#define PRI_PIDT_PREFIX ""
+#define PRI_SIZE_PREFIX "z"
+
+#define COROUTINE_H "coroutine/arm64/Context.h"
+#ifndef RUBY_JMP_BUF
+#define RUBY_JMP_BUF jmp_buf
+#endif
+#define HAVE_CONFIG_H 1
+
+#define DLEXT ".bundle"
+#define DLEXT2 ".so"
+
+#ifndef RSHIFT
+#define RSHIFT(x,y) ((x)>>(int)(y))
+#endif
+
+#define TIMET_MAX LONG_MAX
+#define TIMET_MIN LONG_MIN
+#define TIMET2NUM(v) LONG2NUM(v)
+#define NUM2TIMET(v) NUM2LONG(v)
+#define RUBY_SETJMP(env) _setjmp(env)
+#define RUBY_LONGJMP(env,val) _longjmp(env,val)
+
+#define RUBY_FUNCTION_NAME_STRING __func__
+#define ruby_posix_signal signal
+
+typedef unsigned long unsigned_clock_t;
+
+#endif

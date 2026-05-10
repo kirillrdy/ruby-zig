@@ -1,0 +1,17 @@
+.{
+    .name = .ruby_zig,
+    .version = "4.0.3",
+    .fingerprint = 0x29184c8050ebd3c7,
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "my_config",
+        "shims",
+    },
+    .dependencies = .{
+        .ruby_src = .{
+            .url = "https://cache.ruby-lang.org/pub/ruby/4.0/ruby-4.0.3.tar.gz",
+            .hash = "N-V-__8AAHHnAQdPWcLgZTBf_aeCe5Y4r-aTIXuRNdgLPFIK",
+        },
+    },
+}
