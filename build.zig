@@ -8,18 +8,21 @@ pub fn build(b: *std.Build) void {
     const ruby_src = ruby_dep.path("");
 
     const is_darwin = target.result.os.tag.isDarwin();
+    const is_windows = target.result.os.tag == .windows;
 
-    const ruby_platform = if (is_darwin) 
+    const ruby_platform = if (is_darwin)
         (if (target.result.cpu.arch == .aarch64) "arm64-darwin" else "x86_64-darwin")
-    else 
+    else if (is_windows)
+        "x64-mingw32"
+    else
         "x86_64-linux";
-    
-    const coroutine_h = if (target.result.cpu.arch == .aarch64) 
-        "coroutine/arm64/Context.h" 
-    else 
+
+    const coroutine_h = if (target.result.cpu.arch == .aarch64)
+        "coroutine/arm64/Context.h"
+    else
         "coroutine/amd64/Context.h";
 
-    const sdk_path = "/nix/store/s2153qblp6ip6z8h41d8hf1i4nr2cfn1-apple-sdk-15.5/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk";
+    const sdk_path = "/nix/store/rcqgjj8hphkhqark1ibiwfaa7yrzniz3-apple-sdk-14.4/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
 
     const exe = b.addExecutable(.{
         .name = "ruby",
@@ -53,24 +56,32 @@ pub fn build(b: *std.Build) void {
     };
 
     const base_flags = &[_][]const u8{
-        "-D_XOPEN_SOURCE", "-D_REENTRANT", "-std=gnu11", "-fcommon", "-DHAVE_CONFIG_H",
+        "-D_REENTRANT", "-std=gnu11", "-fcommon", "-DHAVE_CONFIG_H",
         "-Wno-implicit-function-declaration", "-Wno-int-conversion", "-Wno-incompatible-pointer-types", "-Wno-error=invalid-constexpr",
-        "-DHAVE_LONG_LONG=1", "-DSIZEOF_LONG=8", "-DSIZEOF_VOIDP=8", "-DSIZEOF_VOID_P=8", "-DSIZEOF_SIZE_T=8",
-        "-DRUBY_EXPORT", "-DHAVE_WORKING_FORK=1", "-DHAVE_FORK=1",
         "-fno-sanitize=undefined",
         "-Wno-error",
         "-DUSE_ZJIT=0", "-DUSE_JIT=0",
     };
 
     const darwin_flags = base_flags ++ &[_][]const u8{
-        "-D_DARWIN_C_SOURCE", "-D_DARWIN_UNLIMITED_SELECT", "-isysroot", sdk_path,
+        "-DRUBY_EXPORT", "-D_XOPEN_SOURCE", "-D_DARWIN_C_SOURCE", "-D_DARWIN_UNLIMITED_SELECT", "-isysroot", sdk_path, "-DHAVE_WORKING_FORK=1", "-DHAVE_FORK=1",
+        "-DHAVE_LONG_LONG=1", "-DSIZEOF_LONG=8", "-DSIZEOF_VOIDP=8", "-DSIZEOF_VOID_P=8", "-DSIZEOF_SIZE_T=8",
+        "-Wno-error=#warnings",
     };
 
     const linux_flags = base_flags ++ &[_][]const u8{
-        "-D_GNU_SOURCE",
+        "-DRUBY_EXPORT", "-D_XOPEN_SOURCE", "-D_GNU_SOURCE", "-DHAVE_WORKING_FORK=1", "-DHAVE_FORK=1",
+        "-DHAVE_LONG_LONG=1", "-DSIZEOF_LONG=8", "-DSIZEOF_VOIDP=8", "-DSIZEOF_VOID_P=8", "-DSIZEOF_SIZE_T=8",
     };
 
-    const common_flags = if (is_darwin) darwin_flags else linux_flags;
+    const windows_flags = base_flags ++ &[_][]const u8{
+        "-DRUBY_EXPORT",
+        "-DWIN32_LEAN_AND_MEAN", "-D_NO_OLDNAMES", "-D_CRT_DECLARE_NONSTDC_NAMES=0",
+        "-DHAVE_LONG_LONG=1", "-DSIZEOF_LONG=4", "-DSIZEOF_VOIDP=8", "-DSIZEOF_VOID_P=8", "-DSIZEOF_SIZE_T=8",
+        "-Wno-pointer-sign", "-Wno-error=pointer-sign", "-Wno-inconsistent-dllimport",
+    };
+
+    const common_flags = if (is_darwin) darwin_flags else if (is_windows) windows_flags else linux_flags;
 
     exe.root_module.addCSourceFiles(.{
         .root = ruby_src,
@@ -131,5 +142,29 @@ pub fn build(b: *std.Build) void {
     if (is_darwin) {
         exe.root_module.linkFramework("CoreFoundation", .{});
     }
+
+    if (is_windows) {
+        const windows_sources = &[_][]const u8{
+            "win32/win32.c",
+            "win32/file.c",
+            "win32/winmain.c",
+            "missing/strlcat.c",
+            "missing/strlcpy.c",
+            "missing/ffs.c",
+            "missing/lgamma_r.c",
+        };
+        exe.root_module.addCSourceFiles(.{
+            .root = ruby_src,
+            .files = windows_sources,
+            .flags = common_flags,
+        });
+        exe.root_module.linkSystemLibrary("ws2_32", .{});
+        exe.root_module.linkSystemLibrary("bcrypt", .{});
+        exe.root_module.linkSystemLibrary("advapi32", .{});
+        exe.root_module.linkSystemLibrary("iphlpapi", .{});
+        exe.root_module.linkSystemLibrary("imagehlp", .{});
+        exe.root_module.linkSystemLibrary("shlwapi", .{});
+    }
+
     b.installArtifact(exe);
 }
