@@ -278,7 +278,9 @@
 #endif
 
 #ifndef _WIN32
+#ifdef __APPLE__
 #define HAVE_BACKTRACE 1
+#endif
 #define HAVE_SCHED_H 1
 #endif
 #define HAVE_GCC_ATOMIC_BUILTINS 1
