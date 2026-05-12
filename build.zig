@@ -4,8 +4,17 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const ruby_dep = b.dependency("ruby_src", .{});
-    const ruby_src = ruby_dep.path("");
+    const ruby_version = "4.0.4";
+    const ruby_url = "https://cache.ruby-lang.org/pub/ruby/4.0/ruby-" ++ ruby_version ++ ".tar.gz";
+
+    const fetch_ruby = b.addSystemCommand(&.{ "sh", "-c" });
+    fetch_ruby.addArg(
+        \\set -e
+        \\curl -fsSL "$1" | tar xz -C "$2" --strip-components=1
+    );
+    fetch_ruby.addArg("sh");
+    fetch_ruby.addArg(ruby_url);
+    const ruby_src = fetch_ruby.addOutputDirectoryArg("ruby-src");
 
     const is_darwin = target.result.os.tag.isDarwin();
     const is_windows = target.result.os.tag == .windows;
