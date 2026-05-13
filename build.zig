@@ -47,6 +47,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addCMacro("COROUTINE_H", b.fmt("\"{s}\"", .{coroutine_h}));
 
     exe.root_module.addIncludePath(b.path("my_config"));
+    exe.root_module.addIncludePath(b.path("my_config/ruby"));
     exe.root_module.addIncludePath(ruby_src.path(b, "include"));
     exe.root_module.addIncludePath(ruby_src.path(b, "."));
     exe.root_module.addIncludePath(ruby_src.path(b, "prism"));
