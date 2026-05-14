@@ -16,7 +16,7 @@ pub fn build(b: *std.Build) void {
     fetch_ruby.addArg(ruby_url);
     const ruby_src = fetch_ruby.addOutputDirectoryArg("ruby-src");
 
-    const is_darwin = target.result.os.tag.isDarwin();
+    const is_darwin = target.result.os.tag == .macos;
     const is_windows = target.result.os.tag == .windows;
 
     const ruby_platform = if (is_darwin)
@@ -66,29 +66,34 @@ pub fn build(b: *std.Build) void {
     };
 
     const base_flags = &[_][]const u8{
-        "-D_REENTRANT", "-std=gnu11", "-fcommon", "-DHAVE_CONFIG_H",
+        "-D_REENTRANT",                       "-std=gnu11",          "-fcommon",                        "-DHAVE_CONFIG_H",
         "-Wno-implicit-function-declaration", "-Wno-int-conversion", "-Wno-incompatible-pointer-types", "-Wno-error=invalid-constexpr",
-        "-fno-sanitize=undefined",
-        "-Wno-error",
-        "-DUSE_ZJIT=0", "-DUSE_JIT=0",
+        "-fno-sanitize=undefined",            "-Wno-error",          "-DUSE_ZJIT=0",                    "-DUSE_JIT=0",
     };
 
     const darwin_flags = base_flags ++ &[_][]const u8{
-        "-DRUBY_EXPORT", "-D_XOPEN_SOURCE", "-D_DARWIN_C_SOURCE", "-D_DARWIN_UNLIMITED_SELECT", "-isysroot", sdk_path, "-DHAVE_WORKING_FORK=1", "-DHAVE_FORK=1",
-        "-DHAVE_LONG_LONG=1", "-DSIZEOF_LONG=8", "-DSIZEOF_VOIDP=8", "-DSIZEOF_VOID_P=8", "-DSIZEOF_SIZE_T=8",
-        "-Wno-error=#warnings",
+        "-DRUBY_EXPORT",      "-D_XOPEN_SOURCE", "-D_DARWIN_C_SOURCE", "-D_DARWIN_UNLIMITED_SELECT", "-isysroot",         sdk_path,               "-DHAVE_WORKING_FORK=1", "-DHAVE_FORK=1",
+        "-DHAVE_LONG_LONG=1", "-DSIZEOF_LONG=8", "-DSIZEOF_VOIDP=8",   "-DSIZEOF_VOID_P=8",          "-DSIZEOF_SIZE_T=8", "-Wno-error=#warnings",
     };
 
     const linux_flags = base_flags ++ &[_][]const u8{
-        "-DRUBY_EXPORT", "-D_XOPEN_SOURCE", "-D_GNU_SOURCE", "-DHAVE_WORKING_FORK=1", "-DHAVE_FORK=1",
-        "-DHAVE_LONG_LONG=1", "-DSIZEOF_LONG=8", "-DSIZEOF_VOIDP=8", "-DSIZEOF_VOID_P=8", "-DSIZEOF_SIZE_T=8",
+        "-DRUBY_EXPORT",      "-D_XOPEN_SOURCE", "-D_GNU_SOURCE",    "-DHAVE_WORKING_FORK=1", "-DHAVE_FORK=1",
+        "-DHAVE_LONG_LONG=1", "-DSIZEOF_LONG=8", "-DSIZEOF_VOIDP=8", "-DSIZEOF_VOID_P=8",     "-DSIZEOF_SIZE_T=8",
     };
 
     const windows_flags = base_flags ++ &[_][]const u8{
         "-DRUBY_EXPORT",
-        "-DWIN32_LEAN_AND_MEAN", "-D_NO_OLDNAMES", "-D_CRT_DECLARE_NONSTDC_NAMES=0",
-        "-DHAVE_LONG_LONG=1", "-DSIZEOF_LONG=4", "-DSIZEOF_VOIDP=8", "-DSIZEOF_VOID_P=8", "-DSIZEOF_SIZE_T=8",
-        "-Wno-pointer-sign", "-Wno-error=pointer-sign", "-Wno-inconsistent-dllimport",
+        "-DWIN32_LEAN_AND_MEAN",
+        "-D_NO_OLDNAMES",
+        "-D_CRT_DECLARE_NONSTDC_NAMES=0",
+        "-DHAVE_LONG_LONG=1",
+        "-DSIZEOF_LONG=4",
+        "-DSIZEOF_VOIDP=8",
+        "-DSIZEOF_VOID_P=8",
+        "-DSIZEOF_SIZE_T=8",
+        "-Wno-pointer-sign",
+        "-Wno-error=pointer-sign",
+        "-Wno-inconsistent-dllimport",
     };
 
     const common_flags = if (is_darwin) darwin_flags else if (is_windows) windows_flags else linux_flags;
@@ -109,9 +114,6 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/unicode.c"), .flags = common_flags });
     exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/trans/newline.c"), .flags = common_flags });
 
-    // Local shims
-    exe.root_module.addCSourceFile(.{ .file = b.path("shims/dmy_symbols.c"), .flags = common_flags });
-
     const prism_sources = &[_][]const u8{
         "prism/api_node.c", "prism/api_pack.c", "prism/diagnostic.c", "prism/encoding.c", "prism/extension.c", "prism/node.c", "prism/options.c", "prism/pack.c", "prism/prettyprint.c", "prism/regexp.c", "prism/serialize.c", "prism/static_literals.c", "prism/token_type.c", "prism/util/pm_buffer.c", "prism/util/pm_char.c", "prism/util/pm_constant_pool.c", "prism/util/pm_integer.c", "prism/util/pm_list.c", "prism/util/pm_memchr.c", "prism/util/pm_newline_list.c", "prism/util/pm_string.c", "prism/util/pm_strncasecmp.c", "prism/util/pm_strpbrk.c", "prism/prism.c", "prism_init.c",
     };
@@ -124,29 +126,29 @@ pub fn build(b: *std.Build) void {
 
     // Handle coroutine
     if (target.result.cpu.arch == .aarch64) {
-         if (is_darwin) {
-             exe.root_module.addCSourceFile(.{
-                 .file = ruby_src.path(b, "coroutine/arm64/Context.S"),
-                 .flags = &[_][]const u8{"-DPREFIXED_SYMBOL(name)=_##name", "-isysroot", sdk_path},
-             });
-         } else {
-             exe.root_module.addCSourceFile(.{
-                 .file = ruby_src.path(b, "coroutine/arm64/Context.S"),
-                 .flags = &[_][]const u8{"-DPREFIXED_SYMBOL(name)=name"},
-             });
-         }
+        if (is_darwin) {
+            exe.root_module.addCSourceFile(.{
+                .file = ruby_src.path(b, "coroutine/arm64/Context.S"),
+                .flags = &[_][]const u8{ "-DPREFIXED_SYMBOL(name)=_##name", "-isysroot", sdk_path },
+            });
+        } else {
+            exe.root_module.addCSourceFile(.{
+                .file = ruby_src.path(b, "coroutine/arm64/Context.S"),
+                .flags = &[_][]const u8{"-DPREFIXED_SYMBOL(name)=name"},
+            });
+        }
     } else if (target.result.cpu.arch == .x86_64) {
-         if (is_darwin) {
-             exe.root_module.addCSourceFile(.{
-                 .file = ruby_src.path(b, "coroutine/amd64/Context.S"),
-                 .flags = &[_][]const u8{"-DPREFIXED_SYMBOL(name)=_##name", "-isysroot", sdk_path},
-             });
-         } else {
-             exe.root_module.addCSourceFile(.{
-                 .file = ruby_src.path(b, "coroutine/amd64/Context.S"),
-                 .flags = &[_][]const u8{"-DPREFIXED_SYMBOL(name)=name"},
-             });
-         }
+        if (is_darwin) {
+            exe.root_module.addCSourceFile(.{
+                .file = ruby_src.path(b, "coroutine/amd64/Context.S"),
+                .flags = &[_][]const u8{ "-DPREFIXED_SYMBOL(name)=_##name", "-isysroot", sdk_path },
+            });
+        } else {
+            exe.root_module.addCSourceFile(.{
+                .file = ruby_src.path(b, "coroutine/amd64/Context.S"),
+                .flags = &[_][]const u8{"-DPREFIXED_SYMBOL(name)=name"},
+            });
+        }
     }
 
     if (is_darwin) {
