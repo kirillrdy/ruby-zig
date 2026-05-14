@@ -95,19 +95,18 @@ fn buildRuby(
     };
 
     const base_flags = &[_][]const u8{
-        "-D_REENTRANT",                       "-std=gnu11",          "-fcommon",                        "-DHAVE_CONFIG_H",
+        "-D_REENTRANT",                       "-std=gnu11",          "-fcommon",
         "-Wno-implicit-function-declaration", "-Wno-int-conversion", "-Wno-incompatible-pointer-types", "-Wno-error=invalid-constexpr",
         "-fno-sanitize=undefined",            "-Wno-error",          "-DUSE_ZJIT=0",                    "-DUSE_JIT=0",
     };
 
     const darwin_flags = base_flags ++ &[_][]const u8{
-        "-DRUBY_EXPORT",      "-D_XOPEN_SOURCE", "-D_DARWIN_C_SOURCE", "-D_DARWIN_UNLIMITED_SELECT", "-isysroot",         sdk_path,               "-DHAVE_WORKING_FORK=1", "-DHAVE_FORK=1",
-        "-DHAVE_LONG_LONG=1", "-DSIZEOF_LONG=8", "-DSIZEOF_VOIDP=8",   "-DSIZEOF_VOID_P=8",          "-DSIZEOF_SIZE_T=8", "-Wno-error=#warnings",
+        "-DRUBY_EXPORT", "-D_XOPEN_SOURCE", "-D_DARWIN_C_SOURCE", "-D_DARWIN_UNLIMITED_SELECT",
+        "-isysroot",     sdk_path,          "-Wno-error=#warnings",
     };
 
     const linux_flags = base_flags ++ &[_][]const u8{
-        "-DRUBY_EXPORT",      "-D_XOPEN_SOURCE", "-D_GNU_SOURCE",    "-DHAVE_WORKING_FORK=1", "-DHAVE_FORK=1",
-        "-DHAVE_LONG_LONG=1", "-DSIZEOF_LONG=8", "-DSIZEOF_VOIDP=8", "-DSIZEOF_VOID_P=8",     "-DSIZEOF_SIZE_T=8",
+        "-DRUBY_EXPORT", "-D_XOPEN_SOURCE", "-D_GNU_SOURCE",
     };
 
     const windows_flags = base_flags ++ &[_][]const u8{
@@ -115,11 +114,6 @@ fn buildRuby(
         "-DWIN32_LEAN_AND_MEAN",
         "-D_NO_OLDNAMES",
         "-D_CRT_DECLARE_NONSTDC_NAMES=0",
-        "-DHAVE_LONG_LONG=1",
-        "-DSIZEOF_LONG=4",
-        "-DSIZEOF_VOIDP=8",
-        "-DSIZEOF_VOID_P=8",
-        "-DSIZEOF_SIZE_T=8",
         "-Wno-pointer-sign",
         "-Wno-error=pointer-sign",
         "-Wno-inconsistent-dllimport",

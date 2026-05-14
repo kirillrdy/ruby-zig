@@ -56,6 +56,7 @@
 #define HAVE_CLOCK_GETTIME 1
 #define HAVE_CLOCK_GETRES 1
 #define HAVE_PTHREAD_H 1
+#define HAVE_WORKING_FORK 1
 #define THREAD_IMPL_H "thread_pthread.h"
 #define THREAD_IMPL_SRC "thread_pthread.c"
 #ifdef __APPLE__
