@@ -194,8 +194,6 @@
 #define RUBY_JMP_BUF jmp_buf
 #endif
 
-#define DLEXT2 ".so"
-
 #ifndef RSHIFT
 #define RSHIFT(x,y) ((x)>>(int)(y))
 #endif
