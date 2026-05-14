@@ -56,7 +56,6 @@
 #define HAVE_GETEGID 1
 #define HAVE_GETGID 1
 #define HAVE_CHOWN 1
-#define HAVE_FLOCK 1
 
 #ifndef _WIN32
 #define HAVE_STRINGS_H 1
@@ -112,7 +111,6 @@
 #define HAVE_STRLCAT 1
 #define HAVE_UMASK 1
 #define HAVE_CHMOD 1
-#define HAVE_CHOWN 1
 #define HAVE_LCHOWN 1
 #define HAVE_FCHOWN 1
 #define HAVE_FCHMOD 1
@@ -122,10 +120,8 @@
 #define HAVE_READLINK 1
 #define HAVE_REALPATH 1
 #define HAVE_GETEUID 1
-#define HAVE_GETUID 1
-#define HAVE_GETEGID 1
-#define HAVE_GETGID 1
 #define HAVE_GETPPID 1
+#define HAVE_FLOCK 1
 #define HAVE_GETPGRP 1
 #define HAVE_SETPGRP 1
 #define HAVE_GETPGID 1
@@ -184,13 +180,6 @@
 #define GID_T int
 #define GETGROUPS_T int
 #define HAVE_GETEUID 1
-#define HAVE_GETUID 1
-#define HAVE_GETEGID 1
-#define HAVE_GETGID 1
-#define HAVE_CHOWN 1
-#define HAVE_DUP 1
-#define HAVE_DUP2 1
-#define HAVE_WAITPID 1
 #define HAVE_CLOCK_GETTIME 1
 #define HAVE_CLOCK_GETRES 1
 #define HAVE_CLOCK_SETTIME 1
@@ -248,7 +237,6 @@
 #define HAVE_ATTRIBUTE_ERROR 1
 #define HAVE_ATTRIBUTE_WARNING 1
 
-#define HAVE_BUILTIN_CHOOSE_EXPR 1
 #define HAVE_BUILTIN_TYPES_COMPATIBLE_P 1
 #define HAVE_BUILTIN_EXPECT 1
 #define HAVE_BUILTIN_FRAME_ADDRESS 1
