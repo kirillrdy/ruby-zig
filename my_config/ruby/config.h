@@ -75,8 +75,10 @@
 #define HAVE_STRUCT_STAT_ST_BLKSIZE 1
 #define HAVE_STRUCT_STAT_ST_BLOCKS 1
 #define HAVE_GETTIMEOFDAY 1
+#ifdef __APPLE__
 #define HAVE_STRLCPY 1
 #define HAVE_STRLCAT 1
+#endif
 #define HAVE_UMASK 1
 #define HAVE_CHMOD 1
 #define HAVE_LCHOWN 1

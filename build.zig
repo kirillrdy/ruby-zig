@@ -4,6 +4,28 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const ruby_src = fetchRubySrc(b);
+
+    const exe = buildRuby(b, target, optimize, ruby_src);
+    b.installArtifact(exe);
+
+    const all_step = b.step("all", "Build Ruby for macOS, Linux, and Windows");
+    const all_targets = [_]struct { query: std.Target.Query, install_dir: []const u8 }{
+        .{ .query = .{ .cpu_arch = .aarch64, .os_tag = .macos }, .install_dir = "macos" },
+        .{ .query = .{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .gnu }, .install_dir = "linux" },
+        .{ .query = .{ .cpu_arch = .x86_64, .os_tag = .windows, .abi = .gnu }, .install_dir = "windows" },
+    };
+    for (all_targets) |target_spec| {
+        const resolved_target = b.resolveTargetQuery(target_spec.query);
+        const target_exe = buildRuby(b, resolved_target, optimize, ruby_src);
+        const install_step = b.addInstallArtifact(target_exe, .{
+            .dest_dir = .{ .override = .{ .custom = target_spec.install_dir } },
+        });
+        all_step.dependOn(&install_step.step);
+    }
+}
+
+fn fetchRubySrc(b: *std.Build) std.Build.LazyPath {
     const ruby_version = "4.0.4";
     const ruby_url = "https://cache.ruby-lang.org/pub/ruby/4.0/ruby-" ++ ruby_version ++ ".tar.gz";
 
@@ -14,8 +36,15 @@ pub fn build(b: *std.Build) void {
     );
     fetch_ruby.addArg("sh");
     fetch_ruby.addArg(ruby_url);
-    const ruby_src = fetch_ruby.addOutputDirectoryArg("ruby-src");
+    return fetch_ruby.addOutputDirectoryArg("ruby-src");
+}
 
+fn buildRuby(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    ruby_src: std.Build.LazyPath,
+) *std.Build.Step.Compile {
     const is_darwin = target.result.os.tag == .macos;
     const is_windows = target.result.os.tag == .windows;
 
@@ -108,6 +137,10 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/crypt.c"), .flags = common_flags });
     exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/explicit_bzero.c"), .flags = common_flags });
     exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/setproctitle.c"), .flags = common_flags });
+    if (!is_darwin) {
+        exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/strlcpy.c"), .flags = common_flags });
+        exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/strlcat.c"), .flags = common_flags });
+    }
     exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/ascii.c"), .flags = common_flags });
     exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/us_ascii.c"), .flags = common_flags });
     exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/utf_8.c"), .flags = common_flags });
@@ -160,8 +193,6 @@ pub fn build(b: *std.Build) void {
             "win32/win32.c",
             "win32/file.c",
             "win32/winmain.c",
-            "missing/strlcat.c",
-            "missing/strlcpy.c",
             "missing/ffs.c",
             "missing/lgamma_r.c",
         };
@@ -178,5 +209,5 @@ pub fn build(b: *std.Build) void {
         exe.root_module.linkSystemLibrary("shlwapi", .{});
     }
 
-    b.installArtifact(exe);
+    return exe;
 }
