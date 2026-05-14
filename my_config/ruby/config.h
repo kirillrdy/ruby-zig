@@ -69,8 +69,6 @@
 #define PRI_PIDT_PREFIX ""
 #define PRI_PTRDIFF_PREFIX "l"
 #define PRI_SIZE_PREFIX "z"
-#define UID_T uid_t
-#define GID_T gid_t
 #define GETGROUPS_T gid_t
 #define HAVE_STRUCT_TIMESPEC 1
 #define HAVE_STRUCT_TIMEZONE 1
@@ -118,7 +116,6 @@
 #define SIZEOF_LONG 4
 #define HAVE_STRUCT_TIMESPEC 1
 #define HAVE_STRUCT_TIMEZONE 1
-#define CANONICALIZATION_FOR_UPPERCASE_PATH 1
 #define PRI_LL_PREFIX "I64"
 #define PRI_PIDT_PREFIX ""
 #define PRI_PTRDIFF_PREFIX "I64"
@@ -138,8 +135,6 @@
 #define HAVE_POPEN 1
 #define HAVE_PCLOSE 1
 #define EXECUTABLE_EXTS ".exe",".com",".cmd",".bat"
-#define UID_T int
-#define GID_T int
 #define GETGROUPS_T int
 #define HAVE_GETEUID 1
 #define HAVE_CLOCK_GETTIME 1
@@ -157,11 +152,8 @@
 #undef __BMI2__
 
 #define __EXTENSIONS__ 1
-#define _ALL_SOURCE 1
 #define _DARWIN_C_SOURCE 1
 #define _GNU_SOURCE 1
-#define _POSIX_PTHREAD_SEMANTICS 1
-#define _TANDEM_SOURCE 1
 
 #define HAVE_LONG_LONG 1
 #define rb_mode_t mode_t
@@ -170,7 +162,6 @@
 #define SIZEOF_SHORT 2
 #define SIZEOF_LONG_LONG 8
 #define SIZEOF_VOIDP 8
-#define SIZEOF_VOID_P 8
 #define SIZEOF_SIZE_T 8
 #define SIZEOF_TIME_T 8
 #define SIZEOF_UINTPTR_T 8
