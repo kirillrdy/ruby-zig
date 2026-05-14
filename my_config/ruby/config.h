@@ -153,10 +153,6 @@
 #undef __BMI__
 #undef __BMI2__
 
-#define __EXTENSIONS__ 1
-#define _DARWIN_C_SOURCE 1
-#define _GNU_SOURCE 1
-
 #define HAVE_LONG_LONG 1
 #define rb_mode_t mode_t
 
@@ -180,13 +176,6 @@
 #define HAVE_VA_ARGS_MACRO 1
 #define HAVE_STMT_AND_DECL_IN_EXPR 1
 
-#ifndef RUBY_PLATFORM
-#define RUBY_PLATFORM "arm64-darwin"
-#endif
-#ifndef RUBY_ARCH
-#define RUBY_ARCH "arm64-darwin"
-#endif
-
 #ifndef _WIN32
 #ifdef __APPLE__
 #define HAVE_BACKTRACE 1
@@ -196,9 +185,6 @@
 #define HAVE_GCC_SYNC_BUILTINS 1
 #define HAVE_STDATOMIC_H 1
 
-#ifndef COROUTINE_H
-#define COROUTINE_H "coroutine/arm64/Context.h"
-#endif
 #ifndef RUBY_JMP_BUF
 #define RUBY_JMP_BUF jmp_buf
 #endif
