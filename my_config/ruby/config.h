@@ -58,7 +58,11 @@
 #define HAVE_PTHREAD_H 1
 #define THREAD_IMPL_H "thread_pthread.h"
 #define THREAD_IMPL_SRC "thread_pthread.c"
+#ifdef __APPLE__
 #define DLEXT ".bundle"
+#else
+#define DLEXT ".so"
+#endif
 #define rb_pid_t pid_t
 #define rb_uid_t uid_t
 #define rb_gid_t gid_t
