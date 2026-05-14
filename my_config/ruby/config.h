@@ -25,7 +25,6 @@
 #define HAVE_EXECVE 1
 #define HAVE_EXECL 1
 #define HAVE_EXECLE 1
-#define HAVE_DUP 1
 #define HAVE_DUP2 1
 #define HAVE_SYSTEM 1
 #define HAVE_WAITPID 1
