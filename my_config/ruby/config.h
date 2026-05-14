@@ -18,20 +18,8 @@
 #define HAVE_MEMMOVE 1
 #define HAVE_GETCWD 1
 #define HAVE_STRCHR 1
-#define HAVE_STRERROR 1
 #define HAVE_STRSTR 1
-#define HAVE_TZSET 1
 #define HAVE_SHUTDOWN 1
-#define HAVE_EXECVE 1
-#define HAVE_EXECL 1
-#define HAVE_EXECLE 1
-#define HAVE_DUP2 1
-#define HAVE_SYSTEM 1
-#define HAVE_WAITPID 1
-#define HAVE_GETUID 1
-#define HAVE_GETEGID 1
-#define HAVE_GETGID 1
-#define HAVE_CHOWN 1
 
 #ifndef _WIN32
 #define HAVE_STRINGS_H 1
@@ -78,36 +66,13 @@
 #define HAVE_STRUCT_TIMEZONE 1
 #define HAVE_STRUCT_STAT_ST_BLKSIZE 1
 #define HAVE_STRUCT_STAT_ST_BLOCKS 1
-#define HAVE_GETTIMEOFDAY 1
 #ifdef __APPLE__
 #define HAVE_STRLCPY 1
 #define HAVE_STRLCAT 1
 #endif
 #define HAVE_UMASK 1
 #define HAVE_CHMOD 1
-#define HAVE_LCHOWN 1
-#define HAVE_FCHOWN 1
-#define HAVE_FCHMOD 1
 #define HAVE_LSTAT 1
-#define HAVE_LINK 1
-#define HAVE_SYMLINK 1
-#define HAVE_READLINK 1
-#define HAVE_REALPATH 1
-#define HAVE_GETEUID 1
-#define HAVE_GETPPID 1
-#define HAVE_FLOCK 1
-#define HAVE_GETPGRP 1
-#define HAVE_SETPGRP 1
-#define HAVE_GETPGID 1
-#define HAVE_SETPGID 1
-#define HAVE_GETSID 1
-#define HAVE_SETSID 1
-#define HAVE_GETPRIORITY 1
-#define HAVE_GETRLIMIT 1
-#define HAVE_SETRLIMIT 1
-#define HAVE_CHROOT 1
-#define HAVE_TRUNCATE 1
-#define HAVE_FTRUNCATE 1
 #define HAVE_STRUCT_STAT_ST_RDEV 1
 #else
 #define HAVE_DIRECT_H 1
@@ -128,24 +93,10 @@
 #define PRI_SIZE_PREFIX "I64"
 #define HAVE_UMASK 1
 #define HAVE_CHMOD 1
-#define HAVE_ACOSH 1
-#define HAVE_ASINH 1
-#define HAVE_ATANH 1
-#define HAVE_CBRT 1
-#define HAVE_ERF 1
-#define HAVE_ROUND 1
-#define HAVE_TGAMMA 1
-#define HAVE_HYPOT 1
-#define HAVE_NAN 1
-#define HAVE_NEXTAFTER 1
-#define HAVE_POPEN 1
-#define HAVE_PCLOSE 1
 #define EXECUTABLE_EXTS ".exe",".com",".cmd",".bat"
 #define GETGROUPS_T int
-#define HAVE_GETEUID 1
 #define HAVE_CLOCK_GETTIME 1
 #define HAVE_CLOCK_GETRES 1
-#define HAVE_GETTIMEOFDAY 1
 #define HAVE_TYPE_NET_LUID 1
 #define HAVE_LSTAT 1
 #endif
