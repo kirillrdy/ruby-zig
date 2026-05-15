@@ -2,7 +2,6 @@
 #define RUBY_CONFIG_H 1
 
 #include <stdio.h>
-#include <stdarg.h>
 
 #define STDC_HEADERS 1
 #define HAVE_STRING_H 1
@@ -72,10 +71,6 @@
 #define HAVE_TYPE_NET_LUID 1
 #define HAVE_LSTAT 1
 #endif
-
-#undef __LZCNT__
-#undef __BMI__
-#undef __BMI2__
 
 #define HAVE_LONG_LONG 1
 
