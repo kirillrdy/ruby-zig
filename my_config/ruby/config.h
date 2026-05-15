@@ -79,13 +79,9 @@
 
 #define HAVE_STDATOMIC_H 1
 
-#ifndef RUBY_JMP_BUF
 #define RUBY_JMP_BUF jmp_buf
-#endif
 
-#ifndef RSHIFT
 #define RSHIFT(x,y) ((x)>>(int)(y))
-#endif
 
 #define TIMET_MAX LONG_MAX
 #define TIMET_MIN LONG_MIN
