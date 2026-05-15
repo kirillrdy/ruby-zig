@@ -15,13 +15,18 @@
 #define HAVE_STRCHR 1
 #define HAVE_STRSTR 1
 #define HAVE_SHUTDOWN 1
+#define HAVE_CLOCK_GETTIME 1
+#define HAVE_CLOCK_GETRES 1
+#define HAVE_STRUCT_TIMESPEC 1
+#define HAVE_STRUCT_TIMEZONE 1
+#define HAVE_UMASK 1
+#define HAVE_CHMOD 1
+#define HAVE_LSTAT 1
 
 #ifndef _WIN32
 #define HAVE_UNISTD_H 1
 #define HAVE_DIRENT_H 1
 #define HAVE_POLL 1
-#define HAVE_CLOCK_GETTIME 1
-#define HAVE_CLOCK_GETRES 1
 #define HAVE_PTHREAD_H 1
 #define HAVE_WORKING_FORK 1
 #define THREAD_IMPL_H "thread_pthread.h"
@@ -40,15 +45,10 @@
 #define PRI_LL_PREFIX "l"
 #define PRI_PTRDIFF_PREFIX "l"
 #define GETGROUPS_T gid_t
-#define HAVE_STRUCT_TIMESPEC 1
-#define HAVE_STRUCT_TIMEZONE 1
 #ifdef __APPLE__
 #define HAVE_STRLCPY 1
 #define HAVE_STRLCAT 1
 #endif
-#define HAVE_UMASK 1
-#define HAVE_CHMOD 1
-#define HAVE_LSTAT 1
 #else
 #define THREAD_IMPL_H "thread_win32.h"
 #define THREAD_IMPL_SRC "thread_win32.c"
@@ -58,18 +58,11 @@
 #define rb_gid_t int
 #define rb_off_t __int64
 #define SIZEOF_LONG 4
-#define HAVE_STRUCT_TIMESPEC 1
-#define HAVE_STRUCT_TIMEZONE 1
 #define PRI_LL_PREFIX "I64"
 #define PRI_PTRDIFF_PREFIX "I64"
-#define HAVE_UMASK 1
-#define HAVE_CHMOD 1
 #define EXECUTABLE_EXTS ".exe",".com",".cmd",".bat"
 #define GETGROUPS_T int
-#define HAVE_CLOCK_GETTIME 1
-#define HAVE_CLOCK_GETRES 1
 #define HAVE_TYPE_NET_LUID 1
-#define HAVE_LSTAT 1
 #endif
 
 #define HAVE_LONG_LONG 1
