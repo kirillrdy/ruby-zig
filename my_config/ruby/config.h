@@ -82,9 +82,6 @@
 #define SIZEOF_TIME_T 8
 #define SIZEOF_UINTPTR_T 8
 
-#ifndef TOKEN_PASTE
-#define TOKEN_PASTE(x,y) x##y
-#endif
 #define HAVE_STRUCT_TIMEVAL 1
 
 #define HAVE_STDATOMIC_H 1
@@ -115,16 +112,9 @@
 
 typedef unsigned long unsigned_clock_t;
 
-#ifndef STATIC_ASSERT
-#define STATIC_ASSERT(name, expr) _Static_assert(expr, #name)
-#endif
-
 #define UINT64T2NUM(v) ULL2NUM(v)
 
 #define NDEBUG 1
-#ifndef is_power_of_two
-#define is_power_of_two(x) (((x) & ((x) - 1)) == 0)
-#endif
 
 #ifdef __APPLE__
 #define HAVE_STRUCT_STAT_ST_ATIMESPEC 1
