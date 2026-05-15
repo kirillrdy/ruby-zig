@@ -5,15 +5,11 @@
 #include <stdarg.h>
 
 #define STDC_HEADERS 1
-#define HAVE_STDLIB_H 1
 #define HAVE_STRING_H 1
-#define HAVE_MEMORY_H 1
 #define HAVE_STDINT_H 1
-#define HAVE_INTTYPES_H 1
 #define HAVE_LIMITS_H 1
 #define HAVE_FLOAT_H 1
 #define HAVE_FCNTL_H 1
-#define HAVE_TIME_H 1
 
 #define HAVE_MEMMOVE 1
 #define HAVE_GETCWD 1
@@ -22,23 +18,8 @@
 #define HAVE_SHUTDOWN 1
 
 #ifndef _WIN32
-#define HAVE_STRINGS_H 1
 #define HAVE_UNISTD_H 1
-#define HAVE_SYS_TYPES_H 1
-#define HAVE_SYS_STAT_H 1
-#define HAVE_SYS_FCNTL_H 1
-#define HAVE_SYS_IOCTL_H 1
-#define HAVE_SYS_PARAM_H 1
-#define HAVE_SYS_SELECT_H 1
-#define HAVE_SYS_TIME_H 1
-#define HAVE_SYS_TIMES_H 1
-#define HAVE_SYS_UIO_H 1
-#define HAVE_SYS_WAIT_H 1
-#define HAVE_UTIME_H 1
 #define HAVE_DIRENT_H 1
-#define HAVE_SYS_RESOURCE_H 1
-#define HAVE_SYS_SOCKET_H 1
-#define HAVE_ARPA_INET_H 1
 #define HAVE_POLL 1
 #define HAVE_CLOCK_GETTIME 1
 #define HAVE_CLOCK_GETRES 1
@@ -64,8 +45,6 @@
 #define GETGROUPS_T gid_t
 #define HAVE_STRUCT_TIMESPEC 1
 #define HAVE_STRUCT_TIMEZONE 1
-#define HAVE_STRUCT_STAT_ST_BLKSIZE 1
-#define HAVE_STRUCT_STAT_ST_BLOCKS 1
 #ifdef __APPLE__
 #define HAVE_STRLCPY 1
 #define HAVE_STRLCAT 1
@@ -73,10 +52,7 @@
 #define HAVE_UMASK 1
 #define HAVE_CHMOD 1
 #define HAVE_LSTAT 1
-#define HAVE_STRUCT_STAT_ST_RDEV 1
 #else
-#define HAVE_DIRECT_H 1
-#define HAVE_MALLOC_H 1
 #define THREAD_IMPL_H "thread_win32.h"
 #define THREAD_IMPL_SRC "thread_win32.c"
 #define DLEXT ".dll"
@@ -101,8 +77,6 @@
 #define HAVE_LSTAT 1
 #endif
 
-#define HAVE_STDBOOL_H 1
-#define HAVE__BOOL 1
 
 #undef __LZCNT__
 #undef __BMI__
@@ -120,24 +94,16 @@
 #define SIZEOF_UINTPTR_T 8
 #define SIZEOF_OFF_T 8
 
-#define HAVE_PROTOTYPES 1
 #ifndef TOKEN_PASTE
 #define TOKEN_PASTE(x,y) x##y
 #endif
-#define HAVE_STDARG_PROTOTYPES 1
-#define HAVE_TYPEOF 1
 #define HAVE_STRUCT_TIMEVAL 1
 
-#define HAVE_VA_ARGS_MACRO 1
-#define HAVE_STMT_AND_DECL_IN_EXPR 1
 
 #ifndef _WIN32
 #ifdef __APPLE__
-#define HAVE_BACKTRACE 1
 #endif
 #endif
-#define HAVE_GCC_ATOMIC_BUILTINS 1
-#define HAVE_GCC_SYNC_BUILTINS 1
 #define HAVE_STDATOMIC_H 1
 
 #ifndef RUBY_JMP_BUF
@@ -193,12 +159,8 @@ typedef unsigned long unsigned_clock_t;
 
 #ifdef __APPLE__
 #define HAVE_STRUCT_STAT_ST_ATIMESPEC 1
-#define HAVE_STRUCT_STAT_ST_MTIMESPEC 1
-#define HAVE_STRUCT_STAT_ST_CTIMESPEC 1
 #elif !defined(_WIN32)
 #define HAVE_STRUCT_STAT_ST_ATIM 1
-#define HAVE_STRUCT_STAT_ST_MTIM 1
-#define HAVE_STRUCT_STAT_ST_CTIM 1
 #define HAVE_MEMRCHR 1
 #endif
 
