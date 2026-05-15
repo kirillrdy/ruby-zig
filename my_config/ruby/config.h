@@ -39,9 +39,7 @@
 #define SIZEOF_LONG 8
 #define RB_THREAD_LOCAL_SPECIFIER __thread
 #define PRI_LL_PREFIX "l"
-#define PRI_PIDT_PREFIX ""
 #define PRI_PTRDIFF_PREFIX "l"
-#define PRI_SIZE_PREFIX "z"
 #define GETGROUPS_T gid_t
 #define HAVE_STRUCT_TIMESPEC 1
 #define HAVE_STRUCT_TIMEZONE 1
@@ -64,9 +62,7 @@
 #define HAVE_STRUCT_TIMESPEC 1
 #define HAVE_STRUCT_TIMEZONE 1
 #define PRI_LL_PREFIX "I64"
-#define PRI_PIDT_PREFIX ""
 #define PRI_PTRDIFF_PREFIX "I64"
-#define PRI_SIZE_PREFIX "I64"
 #define HAVE_UMASK 1
 #define HAVE_CHMOD 1
 #define EXECUTABLE_EXTS ".exe",".com",".cmd",".bat"
@@ -77,13 +73,11 @@
 #define HAVE_LSTAT 1
 #endif
 
-
 #undef __LZCNT__
 #undef __BMI__
 #undef __BMI2__
 
 #define HAVE_LONG_LONG 1
-#define rb_mode_t mode_t
 
 #define SIZEOF_INT 4
 #define SIZEOF_SHORT 2
@@ -92,18 +86,12 @@
 #define SIZEOF_SIZE_T 8
 #define SIZEOF_TIME_T 8
 #define SIZEOF_UINTPTR_T 8
-#define SIZEOF_OFF_T 8
 
 #ifndef TOKEN_PASTE
 #define TOKEN_PASTE(x,y) x##y
 #endif
 #define HAVE_STRUCT_TIMEVAL 1
 
-
-#ifndef _WIN32
-#ifdef __APPLE__
-#endif
-#endif
 #define HAVE_STDATOMIC_H 1
 
 #ifndef RUBY_JMP_BUF
@@ -137,20 +125,6 @@ typedef unsigned long unsigned_clock_t;
 #endif
 
 #define UINT64T2NUM(v) ULL2NUM(v)
-
-// Force Ruby's xmalloc globally to avoid conflicts with Onigmo
-#ifndef xmalloc
-#define xmalloc ruby_xmalloc
-#endif
-#ifndef xcalloc
-#define xcalloc ruby_xcalloc
-#endif
-#ifndef xrealloc
-#define xrealloc ruby_xrealloc
-#endif
-#ifndef xfree
-#define xfree ruby_xfree
-#endif
 
 #define NDEBUG 1
 #ifndef is_power_of_two
