@@ -4,7 +4,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const ruby_src = fetchRubySrc(b);
+    const ruby_src = b.dependency("ruby", .{}).path("");
     const macos_sdk = fetchMacosSdk(b);
 
     const exe = buildRuby(b, target, optimize, ruby_src, macos_sdk);
@@ -24,20 +24,6 @@ pub fn build(b: *std.Build) void {
         });
         all_step.dependOn(&install_step.step);
     }
-}
-
-fn fetchRubySrc(b: *std.Build) std.Build.LazyPath {
-    const ruby_version = "4.0.4";
-    const ruby_url = "https://cache.ruby-lang.org/pub/ruby/4.0/ruby-" ++ ruby_version ++ ".tar.gz";
-
-    const fetch_ruby = b.addSystemCommand(&.{ "sh", "-c" });
-    fetch_ruby.addArg(
-        \\set -e
-        \\curl -fsSL "$1" | tar xz -C "$2" --strip-components=1
-    );
-    fetch_ruby.addArg("sh");
-    fetch_ruby.addArg(ruby_url);
-    return fetch_ruby.addOutputDirectoryArg("ruby-src");
 }
 
 // URL mirrors nixpkgs apple-sdk_14
@@ -119,13 +105,14 @@ fn buildRuby(
     };
 
     const base_flags = &[_][]const u8{
-        "-D_REENTRANT",                       "-std=gnu11",          "-fcommon",
-        "-Wno-implicit-function-declaration", "-Wno-int-conversion", "-Wno-incompatible-pointer-types", "-Wno-error=invalid-constexpr",
-        "-fno-sanitize=undefined",            "-Wno-error",          "-DUSE_ZJIT=0",                    "-DUSE_JIT=0",
+        "-D_REENTRANT",                       "-std=gnu11",              "-fcommon",
+        "-Wno-implicit-function-declaration", "-Wno-int-conversion",     "-Wno-incompatible-pointer-types",
+        "-Wno-error=invalid-constexpr",       "-fno-sanitize=undefined", "-Wno-error",
+        "-DUSE_ZJIT=0",                       "-DUSE_JIT=0",
     };
 
     const darwin_flags = base_flags ++ &[_][]const u8{
-        "-DRUBY_EXPORT", "-D_XOPEN_SOURCE", "-D_DARWIN_C_SOURCE", "-D_DARWIN_UNLIMITED_SELECT",
+        "-DRUBY_EXPORT",        "-D_XOPEN_SOURCE", "-D_DARWIN_C_SOURCE", "-D_DARWIN_UNLIMITED_SELECT",
         "-Wno-error=#warnings",
     };
 

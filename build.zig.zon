@@ -8,5 +8,10 @@
         "my_config",
         "shims",
     },
-    .dependencies = .{},
+    .dependencies = .{
+        .ruby = .{
+            .url = "https://cache.ruby-lang.org/pub/ruby/4.0/ruby-4.0.4.zip",
+            .hash = "N-V-__8AALipAgcdrSf-AVe_2BgQB8lV1tzi8JVG8VmXjE01",
+        },
+    },
 }
