@@ -5,8 +5,9 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const ruby_src = fetchRubySrc(b);
+    const macos_sdk = fetchMacosSdk(b);
 
-    const exe = buildRuby(b, target, optimize, ruby_src);
+    const exe = buildRuby(b, target, optimize, ruby_src, macos_sdk);
     b.installArtifact(exe);
 
     const all_step = b.step("all", "Build Ruby for macOS, Linux, and Windows");
@@ -17,7 +18,7 @@ pub fn build(b: *std.Build) void {
     };
     for (all_targets) |target_spec| {
         const resolved_target = b.resolveTargetQuery(target_spec.query);
-        const target_exe = buildRuby(b, resolved_target, optimize, ruby_src);
+        const target_exe = buildRuby(b, resolved_target, optimize, ruby_src, macos_sdk);
         const install_step = b.addInstallArtifact(target_exe, .{
             .dest_dir = .{ .override = .{ .custom = target_spec.install_dir } },
         });
@@ -39,11 +40,37 @@ fn fetchRubySrc(b: *std.Build) std.Build.LazyPath {
     return fetch_ruby.addOutputDirectoryArg("ruby-src");
 }
 
+// URL mirrors nixpkgs apple-sdk_14
+// (pkgs/by-name/ap/apple-sdk/metadata/versions.json, version 14.4).
+fn fetchMacosSdk(b: *std.Build) std.Build.LazyPath {
+    const sdk_url = "https://swcdn.apple.com/content/downloads/14/48/052-59890-A_I0F5YGAY0Y/p9n40hio7892gou31o1v031ng6fnm9sb3c/CLTools_macOSNMOS_SDK.pkg";
+
+    const fetch_sdk = b.addSystemCommand(&.{ "sh", "-c" });
+    fetch_sdk.addArg(
+        \\set -e
+        \\url="$1"; out="$2"
+        \\tmp=$(mktemp -d)
+        \\trap 'rm -rf "$tmp"' EXIT
+        \\curl -fsSL "$url" -o "$tmp/sdk.pkg"
+        \\pkgutil --expand-full "$tmp/sdk.pkg" "$tmp/expanded"
+        \\sdk_src=$(find "$tmp/expanded" -type d -name "MacOSX*.sdk" -print -quit)
+        \\test -n "$sdk_src" || { echo "MacOSX*.sdk not found in pkg payload" >&2; exit 1; }
+        \\cp -R "$sdk_src/." "$out/"
+        \\# Apple's SDK ships Ruby.framework; its headers shadow our own ruby/*.h via
+        \\# clang's framework lookup. We're building Ruby ourselves, so drop it.
+        \\rm -rf "$out/System/Library/Frameworks/Ruby.framework"
+    );
+    fetch_sdk.addArg("sh");
+    fetch_sdk.addArg(sdk_url);
+    return fetch_sdk.addOutputDirectoryArg("macos-sdk");
+}
+
 fn buildRuby(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     ruby_src: std.Build.LazyPath,
+    macos_sdk: std.Build.LazyPath,
 ) *std.Build.Step.Compile {
     const is_darwin = target.result.os.tag == .macos;
     const is_windows = target.result.os.tag == .windows;
@@ -59,8 +86,6 @@ fn buildRuby(
         "coroutine/arm64/Context.h"
     else
         "coroutine/amd64/Context.h";
-
-    const sdk_path = "/nix/store/rcqgjj8hphkhqark1ibiwfaa7yrzniz3-apple-sdk-14.4/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
 
     const exe = b.addExecutable(.{
         .name = "ruby",
@@ -84,10 +109,9 @@ fn buildRuby(
     exe.root_module.addIncludePath(b.path("shims"));
 
     if (is_darwin) {
-        // Add SDK paths
-        exe.root_module.addSystemIncludePath(.{ .cwd_relative = sdk_path ++ "/usr/include" });
-        exe.root_module.addFrameworkPath(.{ .cwd_relative = sdk_path ++ "/System/Library/Frameworks" });
-        exe.root_module.addLibraryPath(.{ .cwd_relative = sdk_path ++ "/usr/lib" });
+        exe.root_module.addSystemIncludePath(macos_sdk.path(b, "usr/include"));
+        exe.root_module.addFrameworkPath(macos_sdk.path(b, "System/Library/Frameworks"));
+        exe.root_module.addLibraryPath(macos_sdk.path(b, "usr/lib"));
     }
 
     const common_sources = &[_][]const u8{
@@ -102,7 +126,7 @@ fn buildRuby(
 
     const darwin_flags = base_flags ++ &[_][]const u8{
         "-DRUBY_EXPORT", "-D_XOPEN_SOURCE", "-D_DARWIN_C_SOURCE", "-D_DARWIN_UNLIMITED_SELECT",
-        "-isysroot",     sdk_path,          "-Wno-error=#warnings",
+        "-Wno-error=#warnings",
     };
 
     const linux_flags = base_flags ++ &[_][]const u8{
@@ -156,7 +180,7 @@ fn buildRuby(
         if (is_darwin) {
             exe.root_module.addCSourceFile(.{
                 .file = ruby_src.path(b, "coroutine/arm64/Context.S"),
-                .flags = &[_][]const u8{ "-DPREFIXED_SYMBOL(name)=_##name", "-isysroot", sdk_path },
+                .flags = &[_][]const u8{"-DPREFIXED_SYMBOL(name)=_##name"},
             });
         } else {
             exe.root_module.addCSourceFile(.{
@@ -168,7 +192,7 @@ fn buildRuby(
         if (is_darwin) {
             exe.root_module.addCSourceFile(.{
                 .file = ruby_src.path(b, "coroutine/amd64/Context.S"),
-                .flags = &[_][]const u8{ "-DPREFIXED_SYMBOL(name)=_##name", "-isysroot", sdk_path },
+                .flags = &[_][]const u8{"-DPREFIXED_SYMBOL(name)=_##name"},
             });
         } else {
             exe.root_module.addCSourceFile(.{
