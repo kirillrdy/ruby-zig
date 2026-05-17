@@ -31,14 +31,17 @@ pub fn build(b: *std.Build) void {
 fn fetchMacosSdk(b: *std.Build) std.Build.LazyPath {
     const sdk_url = "https://swcdn.apple.com/content/downloads/14/48/052-59890-A_I0F5YGAY0Y/p9n40hio7892gou31o1v031ng6fnm9sb3c/CLTools_macOSNMOS_SDK.pkg";
 
-    const fetch_sdk = b.addSystemCommand(&.{ "sh", "-c" });
-    fetch_sdk.addArg(
+    const curl = b.addSystemCommand(&.{ "curl", "-fsSL", "-o" });
+    const pkg_file = curl.addOutputFileArg("sdk.pkg");
+    curl.addArg(sdk_url);
+
+    const extract = b.addSystemCommand(&.{ "sh", "-c" });
+    extract.addArg(
         \\set -e
-        \\url="$1"; out="$2"
+        \\pkg="$1"; out="$2"
         \\tmp=$(mktemp -d)
         \\trap 'rm -rf "$tmp"' EXIT
-        \\curl -fsSL "$url" -o "$tmp/sdk.pkg"
-        \\pkgutil --expand-full "$tmp/sdk.pkg" "$tmp/expanded"
+        \\pkgutil --expand-full "$pkg" "$tmp/expanded"
         \\sdk_src=$(find "$tmp/expanded" -type d -name "MacOSX*.sdk" -print -quit)
         \\test -n "$sdk_src" || { echo "MacOSX*.sdk not found in pkg payload" >&2; exit 1; }
         \\cp -R "$sdk_src/." "$out/"
@@ -46,9 +49,9 @@ fn fetchMacosSdk(b: *std.Build) std.Build.LazyPath {
         \\# clang's framework lookup. We're building Ruby ourselves, so drop it.
         \\rm -rf "$out/System/Library/Frameworks/Ruby.framework"
     );
-    fetch_sdk.addArg("sh");
-    fetch_sdk.addArg(sdk_url);
-    return fetch_sdk.addOutputDirectoryArg("macos-sdk");
+    extract.addArg("sh");
+    extract.addFileArg(pkg_file);
+    return extract.addOutputDirectoryArg("macos-sdk");
 }
 
 fn buildRuby(
