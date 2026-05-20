@@ -9,6 +9,9 @@
 #define HAVE_LIMITS_H 1
 #define HAVE_FLOAT_H 1
 #define HAVE_FCNTL_H 1
+#if defined(__x86_64__) || defined(__i386__)
+#define HAVE_X86INTRIN_H 1
+#endif
 
 #define HAVE_MEMMOVE 1
 #define HAVE_GETCWD 1
