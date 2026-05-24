@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #define STDC_HEADERS 1
+#define HAVE_STDLIB_H 1
 #define HAVE_STRING_H 1
 #define HAVE_STDINT_H 1
 #define HAVE_LIMITS_H 1
@@ -32,6 +33,11 @@
 #define HAVE_POLL 1
 #define HAVE_PTHREAD_H 1
 #define HAVE_WORKING_FORK 1
+#define HAVE_DLADDR 1
+#define HAVE_GMTIME_R 1
+#define HAVE_TERMIOS_H 1
+#define HAVE_SYS_IOCTL_H 1
+#define HAVE_FSYNC 1
 #define THREAD_IMPL_H "thread_pthread.h"
 #define THREAD_IMPL_SRC "thread_pthread.c"
 #ifdef __APPLE__
@@ -113,6 +119,25 @@ typedef unsigned long unsigned_clock_t;
 #elif !defined(_WIN32)
 #define HAVE_STRUCT_STAT_ST_ATIM 1
 #define HAVE_MEMRCHR 1
+#endif
+
+#ifdef HAVE_DLADDR
+#include <dlfcn.h>
+int custom_dladdr(const void *addr, Dl_info *info);
+#define dladdr(addr, info) custom_dladdr(addr, info)
+#endif
+
+#define HAVE_TYPE_RB_IO_MODE_T 1
+#define HAVE_RB_REG_ONIG_MATCH 1
+
+#define HAVE_RB_IO_CLOSED_P 1
+#define HAVE_RB_IO_DESCRIPTOR 1
+#define HAVE_RB_IO_PATH 1
+#define HAVE_RB_IO_GET_WRITE_IO 1
+#define HAVE_RB_IO_OPEN_DESCRIPTOR 1
+
+#ifndef XCASE
+#define XCASE 0
 #endif
 
 #endif

@@ -7,8 +7,8 @@ pub fn build(b: *std.Build) void {
     const ruby_src = b.dependency("ruby", .{}).path("");
     const macos_sdk = fetchMacosSdk(b);
 
-    const exe = buildRuby(b, target, optimize, ruby_src, macos_sdk);
-    b.installArtifact(exe);
+    const ruby_build = buildRuby(b, target, optimize, ruby_src, macos_sdk);
+    installRuby(b, b.getInstallStep(), ruby_build.exe, ruby_build.lib, null, ruby_src, ruby_build.platform, target);
 
     const all_step = b.step("all", "Build Ruby for macOS, Linux, and Windows");
     const all_targets = [_]struct { query: std.Target.Query, install_dir: []const u8 }{
@@ -18,11 +18,8 @@ pub fn build(b: *std.Build) void {
     };
     for (all_targets) |target_spec| {
         const resolved_target = b.resolveTargetQuery(target_spec.query);
-        const target_exe = buildRuby(b, resolved_target, optimize, ruby_src, macos_sdk);
-        const install_step = b.addInstallArtifact(target_exe, .{
-            .dest_dir = .{ .override = .{ .custom = target_spec.install_dir } },
-        });
-        all_step.dependOn(&install_step.step);
+        const target_build = buildRuby(b, resolved_target, optimize, ruby_src, macos_sdk);
+        installRuby(b, all_step, target_build.exe, target_build.lib, target_spec.install_dir, ruby_src, target_build.platform, resolved_target);
     }
 }
 
@@ -54,13 +51,19 @@ fn fetchMacosSdk(b: *std.Build) std.Build.LazyPath {
     return extract.addOutputDirectoryArg("macos-sdk");
 }
 
+const RubyBuild = struct {
+    exe: *std.Build.Step.Compile,
+    lib: *std.Build.Step.Compile,
+    platform: []const u8,
+};
+
 fn buildRuby(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     ruby_src: std.Build.LazyPath,
     macos_sdk: std.Build.LazyPath,
-) *std.Build.Step.Compile {
+) RubyBuild {
     const is_darwin = target.result.os.tag == .macos;
     const is_windows = target.result.os.tag == .windows;
 
@@ -76,8 +79,9 @@ fn buildRuby(
     else
         "coroutine/amd64/Context.h";
 
-    const exe = b.addExecutable(.{
-        .name = "ruby",
+    const lib = b.addLibrary(.{
+        .name = "ruby-4.0.4",
+        .linkage = .dynamic,
         .root_module = b.createModule(.{
             .target = target,
             .optimize = optimize,
@@ -85,32 +89,39 @@ fn buildRuby(
         }),
     });
 
-    exe.root_module.addCMacro("RUBY_PLATFORM", b.fmt("\"{s}\"", .{ruby_platform}));
-    exe.root_module.addCMacro("RUBY_ARCH", b.fmt("\"{s}\"", .{ruby_platform}));
-    exe.root_module.addCMacro("COROUTINE_H", b.fmt("\"{s}\"", .{coroutine_h}));
+    lib.root_module.addCMacro("RUBY_PLATFORM", b.fmt("\"{s}\"", .{ruby_platform}));
+    lib.root_module.addCMacro("RUBY_ARCH", b.fmt("\"{s}\"", .{ruby_platform}));
+    lib.root_module.addCMacro("COROUTINE_H", b.fmt("\"{s}\"", .{coroutine_h}));
+    lib.root_module.addCMacro("LOAD_RELATIVE", "1");
 
-    exe.root_module.addIncludePath(b.path("my_config"));
-    exe.root_module.addIncludePath(b.path("my_config/ruby"));
-    exe.root_module.addIncludePath(ruby_src.path(b, "include"));
-    exe.root_module.addIncludePath(ruby_src.path(b, "."));
-    exe.root_module.addIncludePath(ruby_src.path(b, "prism"));
-    exe.root_module.addIncludePath(ruby_src.path(b, "enc/unicode/17.0.0"));
-    exe.root_module.addIncludePath(b.path("shims"));
+    lib.root_module.addIncludePath(b.path("my_config"));
+    lib.root_module.addIncludePath(b.path("my_config/ruby"));
+    lib.root_module.addIncludePath(ruby_src.path(b, "include"));
+    lib.root_module.addIncludePath(ruby_src.path(b, "."));
+    lib.root_module.addIncludePath(ruby_src.path(b, "prism"));
+    lib.root_module.addIncludePath(ruby_src.path(b, "enc/unicode/17.0.0"));
+    lib.root_module.addIncludePath(b.path("shims"));
+    lib.root_module.addIncludePath(ruby_src.path(b, "ext/etc"));
+    lib.root_module.addIncludePath(ruby_src.path(b, "ext/date"));
+    lib.root_module.addIncludePath(ruby_src.path(b, "ext/ripper"));
+    lib.root_module.addIncludePath(ruby_src.path(b, "ext/io/console"));
 
     if (is_darwin) {
-        exe.root_module.addSystemIncludePath(macos_sdk.path(b, "usr/include"));
-        exe.root_module.addFrameworkPath(macos_sdk.path(b, "System/Library/Frameworks"));
-        exe.root_module.addLibraryPath(macos_sdk.path(b, "usr/lib"));
+        lib.root_module.addSystemIncludePath(macos_sdk.path(b, "usr/include"));
+        lib.root_module.addFrameworkPath(macos_sdk.path(b, "System/Library/Frameworks"));
+        lib.root_module.addLibraryPath(macos_sdk.path(b, "usr/lib"));
     }
 
     const common_sources = &[_][]const u8{
-        "array.c", "ast.c", "bignum.c", "class.c", "compar.c", "compile.c", "complex.c", "cont.c", "debug.c", "debug_counter.c", "dir.c", "dln_find.c", "encoding.c", "enum.c", "enumerator.c", "error.c", "eval.c", "file.c", "gc.c", "hash.c", "inits.c", "imemo.c", "io.c", "io_buffer.c", "iseq.c", "load.c", "marshal.c", "math.c", "memory_view.c", "concurrent_set.c", "box.c", "node.c", "node_dump.c", "numeric.c", "object.c", "pack.c", "parse.c", "parser_st.c", "proc.c", "process.c", "ractor.c", "random.c", "range.c", "rational.c", "re.c", "regcomp.c", "regenc.c", "regerror.c", "regexec.c", "regparse.c", "regsyntax.c", "ruby.c", "ruby_parser.c", "scheduler.c", "shape.c", "signal.c", "sprintf.c", "st.c", "strftime.c", "string.c", "struct.c", "symbol.c", "thread.c", "time.c", "transcode.c", "util.c", "variable.c", "version.c", "vm.c", "vm_backtrace.c", "vm_dump.c", "vm_sync.c", "vm_trace.c", "weakmap.c", "miniinit.c", "dmydln.c", "main.c", "set.c", "pathname.c",
+        "array.c", "ast.c", "bignum.c", "class.c", "compar.c", "compile.c", "complex.c", "cont.c", "debug.c", "debug_counter.c", "dir.c", "dln_find.c", "encoding.c", "enum.c", "enumerator.c", "error.c", "eval.c", "file.c", "gc.c", "hash.c", "inits.c", "imemo.c", "io.c", "io_buffer.c", "iseq.c", "load.c", "marshal.c", "math.c", "memory_view.c", "concurrent_set.c", "box.c", "node.c", "node_dump.c", "numeric.c", "object.c", "pack.c", "parse.c", "parser_st.c", "proc.c", "process.c", "ractor.c", "random.c", "range.c", "rational.c", "re.c", "regcomp.c", "regenc.c", "regerror.c", "regexec.c", "regparse.c", "regsyntax.c", "ruby.c", "ruby_parser.c", "scheduler.c", "shape.c", "signal.c", "sprintf.c", "st.c", "strftime.c", "string.c", "struct.c", "symbol.c", "thread.c", "time.c", "transcode.c", "util.c", "variable.c", "version.c", "vm.c", "vm_backtrace.c", "vm_dump.c", "vm_sync.c", "vm_trace.c", "weakmap.c", "loadpath.c", "dmydln.c", "set.c", "pathname.c",
     };
 
     const base_flags = &[_][]const u8{
         "-D_REENTRANT",                       "-std=gnu11",              "-fcommon",
+        "-DTRIGGER_REBUILD=7",
         "-Wno-implicit-function-declaration", "-Wno-int-conversion",     "-Wno-incompatible-pointer-types",
         "-Wno-error=invalid-constexpr",       "-fno-sanitize=undefined", "-Wno-error",
+        "-Wno-deprecated-declarations",
         "-DUSE_ZJIT=0",                       "-DUSE_JIT=0",
     };
 
@@ -135,31 +146,59 @@ fn buildRuby(
 
     const common_flags = if (is_darwin) darwin_flags else if (is_windows) windows_flags else linux_flags;
 
-    exe.root_module.addCSourceFiles(.{
+    lib.root_module.addCSourceFiles(.{
         .root = ruby_src,
         .files = common_sources,
         .flags = common_flags,
     });
 
+    lib.root_module.addCSourceFile(.{
+        .file = b.path("shims/miniinit_custom.c"),
+        .flags = common_flags,
+    });
+
     // Missing/Enc sources from dependency
-    exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/crypt.c"), .flags = common_flags });
-    exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/explicit_bzero.c"), .flags = common_flags });
-    exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/setproctitle.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/crypt.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/explicit_bzero.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/setproctitle.c"), .flags = common_flags });
     if (!is_darwin) {
-        exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/strlcpy.c"), .flags = common_flags });
-        exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/strlcat.c"), .flags = common_flags });
+        lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/strlcpy.c"), .flags = common_flags });
+        lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/strlcat.c"), .flags = common_flags });
     }
-    exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/ascii.c"), .flags = common_flags });
-    exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/us_ascii.c"), .flags = common_flags });
-    exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/utf_8.c"), .flags = common_flags });
-    exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/unicode.c"), .flags = common_flags });
-    exe.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/trans/newline.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/ascii.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/us_ascii.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/utf_8.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/unicode.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/trans/newline.c"), .flags = common_flags });
+
+    // Extension C source files
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/monitor/monitor.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/etc/etc.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/stringio/stringio.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/strscan/strscan.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/fcntl/fcntl.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/date/date_core.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/date/date_parse.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/date/date_strftime.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/date/date_strptime.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/io/console/console.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/io/wait/wait.c"), .flags = common_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/io/nonblock/nonblock.c"), .flags = common_flags });
+
+    const ripper_flags = b.allocator.alloc([]const u8, common_flags.len + 1) catch unreachable;
+    @memcpy(ripper_flags[0..common_flags.len], common_flags);
+    ripper_flags[common_flags.len] = "-DRIPPER";
+
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/ripper/ripper.c"), .flags = ripper_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/ripper/ripper_init.c"), .flags = ripper_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/ripper/eventids1.c"), .flags = ripper_flags });
+    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/ripper/eventids2.c"), .flags = ripper_flags });
 
     const prism_sources = &[_][]const u8{
         "prism/api_node.c", "prism/api_pack.c", "prism/diagnostic.c", "prism/encoding.c", "prism/extension.c", "prism/node.c", "prism/options.c", "prism/pack.c", "prism/prettyprint.c", "prism/regexp.c", "prism/serialize.c", "prism/static_literals.c", "prism/token_type.c", "prism/util/pm_buffer.c", "prism/util/pm_char.c", "prism/util/pm_constant_pool.c", "prism/util/pm_integer.c", "prism/util/pm_list.c", "prism/util/pm_memchr.c", "prism/util/pm_newline_list.c", "prism/util/pm_string.c", "prism/util/pm_strncasecmp.c", "prism/util/pm_strpbrk.c", "prism/prism.c", "prism_init.c",
     };
 
-    exe.root_module.addCSourceFiles(.{
+    lib.root_module.addCSourceFiles(.{
         .root = ruby_src,
         .files = prism_sources,
         .flags = common_flags,
@@ -168,24 +207,24 @@ fn buildRuby(
     // Handle coroutine
     if (target.result.cpu.arch == .aarch64) {
         if (is_darwin) {
-            exe.root_module.addCSourceFile(.{
+            lib.root_module.addCSourceFile(.{
                 .file = ruby_src.path(b, "coroutine/arm64/Context.S"),
                 .flags = &[_][]const u8{"-DPREFIXED_SYMBOL(name)=_##name"},
             });
         } else {
-            exe.root_module.addCSourceFile(.{
+            lib.root_module.addCSourceFile(.{
                 .file = ruby_src.path(b, "coroutine/arm64/Context.S"),
                 .flags = &[_][]const u8{"-DPREFIXED_SYMBOL(name)=name"},
             });
         }
     } else if (target.result.cpu.arch == .x86_64) {
         if (is_darwin) {
-            exe.root_module.addCSourceFile(.{
+            lib.root_module.addCSourceFile(.{
                 .file = ruby_src.path(b, "coroutine/amd64/Context.S"),
                 .flags = &[_][]const u8{"-DPREFIXED_SYMBOL(name)=_##name"},
             });
         } else {
-            exe.root_module.addCSourceFile(.{
+            lib.root_module.addCSourceFile(.{
                 .file = ruby_src.path(b, "coroutine/amd64/Context.S"),
                 .flags = &[_][]const u8{"-DPREFIXED_SYMBOL(name)=name"},
             });
@@ -193,29 +232,544 @@ fn buildRuby(
     }
 
     if (is_darwin) {
-        exe.root_module.linkFramework("CoreFoundation", .{});
+        lib.root_module.linkFramework("CoreFoundation", .{});
     }
 
     if (is_windows) {
         const windows_sources = &[_][]const u8{
             "win32/win32.c",
             "win32/file.c",
-            "win32/winmain.c",
             "missing/ffs.c",
             "missing/lgamma_r.c",
         };
-        exe.root_module.addCSourceFiles(.{
+        lib.root_module.addCSourceFiles(.{
             .root = ruby_src,
             .files = windows_sources,
             .flags = common_flags,
         });
-        exe.root_module.linkSystemLibrary("ws2_32", .{});
-        exe.root_module.linkSystemLibrary("bcrypt", .{});
-        exe.root_module.linkSystemLibrary("advapi32", .{});
-        exe.root_module.linkSystemLibrary("iphlpapi", .{});
-        exe.root_module.linkSystemLibrary("imagehlp", .{});
-        exe.root_module.linkSystemLibrary("shlwapi", .{});
+        lib.root_module.linkSystemLibrary("ws2_32", .{});
+        lib.root_module.linkSystemLibrary("bcrypt", .{});
+        lib.root_module.linkSystemLibrary("advapi32", .{});
+        lib.root_module.linkSystemLibrary("iphlpapi", .{});
+        lib.root_module.linkSystemLibrary("imagehlp", .{});
+        lib.root_module.linkSystemLibrary("shlwapi", .{});
     }
 
-    return exe;
+    const exe = b.addExecutable(.{
+        .name = "ruby",
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+
+    exe.root_module.addCSourceFile(.{
+        .file = ruby_src.path(b, "main.c"),
+        .flags = common_flags,
+    });
+
+    exe.root_module.addCMacro("LOAD_RELATIVE", "1");
+
+    if (is_windows) {
+        exe.root_module.addCSourceFile(.{
+            .file = ruby_src.path(b, "win32/winmain.c"),
+            .flags = common_flags,
+        });
+    }
+
+    exe.root_module.addIncludePath(b.path("my_config"));
+    exe.root_module.addIncludePath(b.path("my_config/ruby"));
+    exe.root_module.addIncludePath(ruby_src.path(b, "include"));
+    exe.root_module.addIncludePath(ruby_src.path(b, "."));
+    exe.root_module.addIncludePath(b.path("shims"));
+
+    if (is_darwin) {
+        exe.root_module.addSystemIncludePath(macos_sdk.path(b, "usr/include"));
+        exe.root_module.addFrameworkPath(macos_sdk.path(b, "System/Library/Frameworks"));
+        exe.root_module.addLibraryPath(macos_sdk.path(b, "usr/lib"));
+    }
+
+    exe.root_module.linkLibrary(lib);
+
+    if (is_darwin) {
+        exe.root_module.addRPathSpecial("@loader_path/../lib");
+    } else if (!is_windows) {
+        exe.root_module.addRPathSpecial("$ORIGIN/../lib");
+    }
+
+    return .{ .exe = exe, .lib = lib, .platform = ruby_platform };
+}
+
+fn installRuby(
+    b: *std.Build,
+    step: *std.Build.Step,
+    exe: *std.Build.Step.Compile,
+    lib: *std.Build.Step.Compile,
+    target_subdir: ?[]const u8,
+    ruby_src: std.Build.LazyPath,
+    ruby_platform: []const u8,
+    target: std.Build.ResolvedTarget,
+) void {
+    const is_darwin = target.result.os.tag == .macos;
+    const is_windows = target.result.os.tag == .windows;
+
+    const bin_dir: std.Build.InstallDir = if (target_subdir) |sub|
+        .{ .custom = b.fmt("{s}/bin", .{sub}) }
+    else
+        .bin;
+
+    const lib_dir: std.Build.InstallDir = if (target_subdir) |sub|
+        .{ .custom = b.fmt("{s}/lib", .{sub}) }
+    else
+        .lib;
+
+    const include_dir: std.Build.InstallDir = if (target_subdir) |sub|
+        .{ .custom = b.fmt("{s}/include", .{sub}) }
+    else
+        .header;
+
+    // Install executable
+    const install_exe = b.addInstallArtifact(exe, .{
+        .dest_dir = .{ .override = bin_dir },
+    });
+    step.dependOn(&install_exe.step);
+
+    // Install shared library
+    const install_lib = b.addInstallArtifact(lib, .{
+        .dest_dir = .{ .override = lib_dir },
+    });
+    step.dependOn(&install_lib.step);
+
+    // Create shared library symlink (not needed on Windows)
+    if (!is_windows) {
+        const ext = if (is_darwin) "dylib" else "so";
+        const symlink = b.addSystemCommand(&.{ "ln", "-sf", b.fmt("libruby-4.0.4.{s}", .{ext}), b.getInstallPath(lib_dir, b.fmt("libruby.{s}", .{ext})) });
+        symlink.step.dependOn(&install_lib.step);
+        step.dependOn(&symlink.step);
+    }
+
+    // Install headers from dependency's include/ to include/ruby-4.0.0
+    const install_headers = b.addInstallDirectory(.{
+        .source_dir = ruby_src.path(b, "include"),
+        .install_dir = include_dir,
+        .install_subdir = "ruby-4.0.0",
+    });
+    step.dependOn(&install_headers.step);
+
+    // Install configuration header to include/ruby-4.0.0/<ruby_platform>/ruby/config.h
+    const config_dest_path = b.fmt("ruby-4.0.0/{s}/ruby/config.h", .{ruby_platform});
+    const install_config = b.addInstallFileWithDir(
+        b.path("my_config/ruby/config.h"),
+        include_dir,
+        config_dest_path,
+    );
+    step.dependOn(&install_config.step);
+
+    // Install standard library .rb files from dependency's lib/ to lib/ruby/4.0.0
+    const install_libs = b.addInstallDirectory(.{
+        .source_dir = ruby_src.path(b, "lib"),
+        .install_dir = lib_dir,
+        .install_subdir = "ruby/4.0.0",
+    });
+    step.dependOn(&install_libs.step);
+
+    const ext_libs = &[_][]const u8{
+        "ext/monitor/lib",
+        "ext/strscan/lib",
+        "ext/date/lib",
+        "ext/digest/lib",
+        "ext/json/lib",
+        "ext/openssl/lib",
+        "ext/psych/lib",
+        "ext/ripper/lib",
+        "ext/socket/lib",
+        "ext/io/console/lib",
+    };
+    for (ext_libs) |ext_lib| {
+        const install_ext_libs = b.addInstallDirectory(.{
+            .source_dir = ruby_src.path(b, ext_lib),
+            .install_dir = lib_dir,
+            .install_subdir = "ruby/4.0.0",
+        });
+        step.dependOn(&install_ext_libs.step);
+    }
+
+    const install_gems_cmd = b.addSystemCommand(&.{ "sh", "-c" });
+    install_gems_cmd.addArg(
+        \\set -e
+        \\gems_dir="$1"; libexec_dir="$2"; bin_src_dir="$3"; target_lib_dir="$4"
+        \\target_bin_dir="$target_lib_dir/bin"
+        \\mkdir -p "$target_bin_dir"
+        \\
+        \\# 1. Copy libexec files to target bin
+        \\if [ -d "$libexec_dir" ]; then
+        \\  chmod -R +w "$target_bin_dir" 2>/dev/null || true
+        \\  cp -Rf "$libexec_dir/." "$target_bin_dir/"
+        \\fi
+        \\
+        \\# 2. Copy bin files to target bin
+        \\if [ -d "$bin_src_dir" ]; then
+        \\  chmod -R +w "$target_bin_dir" 2>/dev/null || true
+        \\  cp -Rf "$bin_src_dir/." "$target_bin_dir/"
+        \\fi
+        \\
+        \\# 3. Unpack all .gem files
+        \\for gem in "$gems_dir"/*.gem; do
+        \\  tmp_dir=$(mktemp -d)
+        \\  tar -xOf "$gem" data.tar.gz | tar -xzf - -C "$tmp_dir"
+        \\  if [ -d "$tmp_dir/lib" ]; then
+        \\    chmod -R +w "$target_lib_dir" 2>/dev/null || true
+        \\    cp -Rf "$tmp_dir/lib/." "$target_lib_dir/"
+        \\  fi
+        \\  if [ -d "$tmp_dir/bin" ]; then
+        \\    chmod -R +w "$target_bin_dir" 2>/dev/null || true
+        \\    cp -Rf "$tmp_dir/bin/." "$target_bin_dir/"
+        \\  elif [ -d "$tmp_dir/exe" ]; then
+        \\    chmod -R +w "$target_bin_dir" 2>/dev/null || true
+        \\    cp -Rf "$tmp_dir/exe/." "$target_bin_dir/"
+        \\  fi
+        \\  rm -rf "$tmp_dir"
+        \\done
+    );
+    install_gems_cmd.addArg("sh");
+    install_gems_cmd.addFileArg(ruby_src.path(b, "gems"));
+    install_gems_cmd.addFileArg(ruby_src.path(b, "libexec"));
+    install_gems_cmd.addFileArg(ruby_src.path(b, "bin"));
+    install_gems_cmd.addArg(b.getInstallPath(lib_dir, "ruby/4.0.0"));
+    install_gems_cmd.step.dependOn(&install_libs.step);
+    step.dependOn(&install_gems_cmd.step);
+
+    // Generate and install rbconfig.rb
+    const dl_ext = if (is_darwin) ".bundle" else if (is_windows) ".dll" else ".so";
+    const so_ext = if (is_darwin) "dylib" else if (is_windows) "dll" else "so";
+    const exe_ext = if (is_windows) ".exe" else "";
+    const path_sep = if (is_windows) ";" else ":";
+    const zig_target = b.fmt("{s}-{s}", .{ @tagName(target.result.cpu.arch), @tagName(target.result.os.tag) });
+
+    const rbconfig_template =
+        \\# encoding: ascii-8bit
+        \\# frozen-string-literal: false
+        \\#
+        \\# The module storing Ruby interpreter configurations on building.
+        \\#
+        \\# This file was created by custom build.zig generator.
+        \\
+        \\module RbConfig
+        \\  RUBY_VERSION_NAME = "ruby-4.0" unless defined? RUBY_VERSION_NAME
+        \\  RUBY_VERSION = "4.0.4" unless defined? RUBY_VERSION
+        \\
+        \\  # Ruby installed directory.
+        \\  TOPDIR = File.dirname(__FILE__).chomp!("/lib/ruby/4.0.0/@RUBY_PLATFORM@")
+        \\  # DESTDIR on make install.
+        \\  DESTDIR = '' unless defined? DESTDIR
+        \\
+        \\  CONFIG = {}
+        \\  CONFIG["DESTDIR"] = DESTDIR
+        \\  CONFIG["MAJOR"] = "4"
+        \\  CONFIG["MINOR"] = "0"
+        \\  CONFIG["TEENY"] = "4"
+        \\  CONFIG["PATCHLEVEL"] = "0"
+        \\  CONFIG["ruby_version"] = "4.0.0"
+        \\  CONFIG["prefix"] = TOPDIR
+        \\  CONFIG["exec_prefix"] = "$(prefix)"
+        \\  CONFIG["bindir"] = "$(exec_prefix)/bin"
+        \\  CONFIG["libdir"] = "$(exec_prefix)/lib"
+        \\  CONFIG["includedir"] = "$(exec_prefix)/include"
+        \\  CONFIG["datarootdir"] = "$(prefix)/share"
+        \\  CONFIG["datadir"] = "$(datarootdir)"
+        \\  CONFIG["mandir"] = "$(datarootdir)/man"
+        \\  CONFIG["sysconfdir"] = "$(prefix)/etc"
+        \\  CONFIG["localstatedir"] = "$(prefix)/var"
+        \\  CONFIG["sharedstatedir"] = "$(prefix)/com"
+        \\  CONFIG["sbindir"] = "$(exec_prefix)/sbin"
+        \\  CONFIG["libexecdir"] = "$(exec_prefix)/libexec"
+        \\
+        \\  CONFIG["arch"] = "@RUBY_PLATFORM@"
+        \\  CONFIG["sitearch"] = "$(arch)"
+        \\  CONFIG["ruby_install_name"] = "ruby"
+        \\  CONFIG["RUBY_INSTALL_NAME"] = "ruby"
+        \\  CONFIG["RUBY_SO_NAME"] = "ruby-4.0.4"
+        \\  CONFIG["EXEEXT"] = "@EXEEXT@"
+        \\  CONFIG["DLEXT"] = "@DLEXT@"
+        \\  CONFIG["SOEXT"] = "@SOEXT@"
+        \\
+        \\  CONFIG["rubyhdrdir"] = "$(includedir)/ruby-4.0.0"
+        \\  CONFIG["rubyarchhdrdir"] = "$(rubyhdrdir)/$(arch)"
+        \\  CONFIG["sitehdrdir"] = "$(rubyhdrdir)/site_ruby"
+        \\  CONFIG["sitearchhdrdir"] = "$(sitehdrdir)/$(arch)"
+        \\  CONFIG["vendorhdrdir"] = "$(rubyhdrdir)/vendor_ruby"
+        \\  CONFIG["vendorarchhdrdir"] = "$(vendorhdrdir)/$(arch)"
+        \\
+        \\  CONFIG["rubylibdir"] = "$(libdir)/ruby/$(ruby_version)"
+        \\  CONFIG["archdir"] = "$(rubylibdir)/$(arch)"
+        \\  CONFIG["sitelibdir"] = "$(libdir)/ruby/site_ruby/$(ruby_version)"
+        \\  CONFIG["sitearchdir"] = "$(sitelibdir)/$(sitearch)"
+        \\  CONFIG["vendorlibdir"] = "$(libdir)/ruby/vendor_ruby/$(ruby_version)"
+        \\  CONFIG["vendorarchdir"] = "$(vendorlibdir)/$(sitearch)"
+        \\
+        \\  CONFIG["rubyarchdir"] = "$(archdir)"
+        \\  CONFIG["rubylibprefix"] = "$(libdir)/ruby"
+        \\
+        \\  CONFIG["PATH_SEPARATOR"] = "@PATH_SEPARATOR@"
+        \\  CONFIG["SHELL"] = "/bin/sh"
+        \\  CONFIG["CC"] = "zig cc -target @ZIG_TARGET@"
+        \\  CONFIG["CPP"] = "zig cc -E -target @ZIG_TARGET@"
+        \\  CONFIG["LDSHARED"] = "zig cc -shared -target @ZIG_TARGET@"
+        \\  CONFIG["LDFLAGS"] = ""
+        \\  CONFIG["DLDFLAGS"] = ""
+        \\  CONFIG["LIBS"] = ""
+        \\
+        \\  MAKEFILE_CONFIG = {}
+        \\  CONFIG.each{|k,v| MAKEFILE_CONFIG[k] = v.dup}
+        \\
+        \\  def RbConfig.expand(val, config = CONFIG)
+        \\    newval = val.gsub(/\$\$|\$\(([^()]+)\)|\$\{([^{}]+)\}/) {
+        \\      var = $&
+        \\      if !(v = $1 || $2)
+        \\        '$'
+        \\      elsif key = config[v = v[/\A[^:]+(?=(?::(.*?)=(.*))?\z)/]]
+        \\        pat, sub = $1, $2
+        \\        config[v] = false
+        \\        config[v] = RbConfig::expand(key, config)
+        \\        key = key.gsub(/#{Regexp.quote(pat)}/n) {sub} if pat
+        \\        key
+        \\      else
+        \\        var
+        \\      end
+        \\    }
+        \\    val.replace(newval) unless newval == val
+        \\    val
+        \\  end
+        \\
+        \\  CONFIG.each_value do |val|
+        \\    RbConfig::expand(val)
+        \\  end
+        \\
+        \\  def RbConfig.ruby
+        \\    File.join(
+        \\      RbConfig::CONFIG["bindir"],
+        \\      RbConfig::CONFIG["ruby_install_name"] + RbConfig::CONFIG["EXEEXT"]
+        \\    )
+        \\  end
+        \\end
+        \\CROSS_COMPILING = nil unless defined? CROSS_COMPILING
+        \\
+    ;
+
+    const rbconfig_content = replaceAll(
+        b,
+        rbconfig_template,
+        "@RUBY_PLATFORM@",
+        ruby_platform,
+        "@EXEEXT@",
+        exe_ext,
+        "@DLEXT@",
+        dl_ext,
+        "@SOEXT@",
+        so_ext,
+        "@PATH_SEPARATOR@",
+        path_sep,
+        "@ZIG_TARGET@",
+        zig_target,
+    );
+
+    const rbconfig_wf = b.addWriteFiles();
+    const rbconfig_file = rbconfig_wf.add("rbconfig.rb", rbconfig_content);
+    const rbconfig_dest_path = b.fmt("ruby/4.0.0/{s}/rbconfig.rb", .{ruby_platform});
+    const install_rbconfig = b.addInstallFileWithDir(rbconfig_file, lib_dir, rbconfig_dest_path);
+    step.dependOn(&install_rbconfig.step);
+
+    // Install setup-hook to nix-support/setup-hook
+    const resolved_hook_content = b.fmt(
+        \\addGemPath() {{
+        \\  addToSearchPath GEM_PATH $1/lib/ruby/gems/4.0.0
+        \\}}
+        \\addRubyLibPath() {{
+        \\  addToSearchPath RUBYLIB $1/lib/ruby/site_ruby
+        \\  addToSearchPath RUBYLIB $1/lib/ruby/site_ruby/4.0.0
+        \\  addToSearchPath RUBYLIB $1/lib/ruby/site_ruby/4.0.0/{0s}
+        \\}}
+        \\
+        \\addEnvHooks "" addGemPath
+        \\addEnvHooks "" addRubyLibPath
+        \\
+    , .{ruby_platform});
+
+    const hook_dir: std.Build.InstallDir = if (target_subdir) |sub|
+        .{ .custom = b.fmt("{s}/nix-support", .{sub}) }
+    else
+        .{ .custom = "nix-support" };
+
+    const hook_wf = b.addWriteFiles();
+    const hook_file = hook_wf.add("setup-hook", resolved_hook_content);
+    const install_hook = b.addInstallFileWithDir(hook_file, hook_dir, "setup-hook");
+    step.dependOn(&install_hook.step);
+
+    // Create empty directories (.keep)
+    const keep_wf = b.addWriteFiles();
+    const keep_file = keep_wf.add(".keep", "");
+
+    const gems_dir: std.Build.InstallDir = if (target_subdir) |sub|
+        .{ .custom = b.fmt("{s}/lib/ruby/gems/4.0.0", .{sub}) }
+    else
+        .{ .custom = "lib/ruby/gems/4.0.0" };
+
+    const site_dir: std.Build.InstallDir = if (target_subdir) |sub|
+        .{ .custom = b.fmt("{s}/lib/ruby/site_ruby/4.0.0", .{sub}) }
+    else
+        .{ .custom = "lib/ruby/site_ruby/4.0.0" };
+
+    const vendor_dir: std.Build.InstallDir = if (target_subdir) |sub|
+        .{ .custom = b.fmt("{s}/lib/ruby/vendor_ruby/4.0.0", .{sub}) }
+    else
+        .{ .custom = "lib/ruby/vendor_ruby/4.0.0" };
+
+    const install_gems_keep = b.addInstallFileWithDir(keep_file, gems_dir, ".keep");
+    const install_site_keep = b.addInstallFileWithDir(keep_file, site_dir, ".keep");
+    const install_vendor_keep = b.addInstallFileWithDir(keep_file, vendor_dir, ".keep");
+
+    step.dependOn(&install_gems_keep.step);
+    step.dependOn(&install_site_keep.step);
+    step.dependOn(&install_vendor_keep.step);
+
+    // Install pkgconfig/ruby-4.0.pc
+    const pc_content = b.fmt(
+        \\ruby_version=4.0.0
+        \\prefix=${{pcfiledir}}/../..
+        \\exec_prefix=${{prefix}}
+        \\bindir=${{exec_prefix}}/bin
+        \\libdir=${{exec_prefix}}/lib
+        \\includedir=${{exec_prefix}}/include
+        \\arch={0s}
+        \\sitearch=${{arch}}
+        \\rubyarchhdrdir=${{includedir}}/ruby-${{ruby_version}}/${{arch}}
+        \\rubyhdrdir=${{includedir}}/ruby-${{ruby_version}}
+        \\
+        \\Name: Ruby
+        \\Description: Object Oriented Script Language
+        \\Version: 4.0.4
+        \\URL: https://www.ruby-lang.org
+        \\Cflags: -I${{rubyarchhdrdir}} -I${{rubyhdrdir}}
+        \\Libs: -L${{libdir}} -lruby-4.0.4 -lpthread -ldl
+        \\
+    , .{ruby_platform});
+
+    const pc_dir: std.Build.InstallDir = if (target_subdir) |sub|
+        .{ .custom = b.fmt("{s}/lib/pkgconfig", .{sub}) }
+    else
+        .{ .custom = "lib/pkgconfig" };
+
+    const pc_wf = b.addWriteFiles();
+    const pc_file = pc_wf.add("ruby-4.0.pc", pc_content);
+    const install_pc = b.addInstallFileWithDir(pc_file, pc_dir, "ruby-4.0.pc");
+    step.dependOn(&install_pc.step);
+
+    // Install wrapper scripts in bin/
+    const wrappers = [_]struct { name: []const u8, gem: []const u8, exec: []const u8 }{
+        .{ .name = "irb", .gem = "irb", .exec = "irb" },
+        .{ .name = "erb", .gem = "erb", .exec = "erb" },
+        .{ .name = "ri", .gem = "rdoc", .exec = "ri" },
+        .{ .name = "rdoc", .gem = "rdoc", .exec = "rdoc" },
+        .{ .name = "rake", .gem = "rake", .exec = "rake" },
+        .{ .name = "racc", .gem = "racc", .exec = "racc" },
+        .{ .name = "rbs", .gem = "rbs", .exec = "rbs" },
+        .{ .name = "rdbg", .gem = "debug", .exec = "rdbg" },
+        .{ .name = "syntax_suggest", .gem = "syntax_suggest", .exec = "syntax_suggest" },
+        .{ .name = "typeprof", .gem = "typeprof", .exec = "typeprof" },
+    };
+
+    const wrapper_wf = b.addWriteFiles();
+    var chmod_cmd: ?*std.Build.Step.Run = null;
+    if (!is_windows) {
+        chmod_cmd = b.addSystemCommand(&.{"chmod", "+x"});
+        step.dependOn(&chmod_cmd.?.step);
+    }
+
+    for (wrappers) |w| {
+        const content = b.fmt(
+            \\#!{0s}
+            \\load File.expand_path('../lib/ruby/4.0.0/bin/{1s}', __dir__)
+            \\
+        , .{ b.getInstallPath(bin_dir, "ruby"), w.exec });
+        const file = wrapper_wf.add(w.name, content);
+        const install_wrapper = b.addInstallFileWithDir(file, bin_dir, w.name);
+        step.dependOn(&install_wrapper.step);
+        if (chmod_cmd) |cc| {
+            cc.step.dependOn(&install_wrapper.step);
+            cc.addArg(b.getInstallPath(bin_dir, w.name));
+        }
+    }
+
+    // gem wrapper
+    const gem_content = b.fmt(
+        \\#!{s}
+        \\# frozen_string_literal: true
+        \\require "rubygems/gem_runner"
+        \\Gem::GemRunner.new.run ARGV.clone
+        \\
+    , .{b.getInstallPath(bin_dir, "ruby")});
+    const gem_file = wrapper_wf.add("gem", gem_content);
+    const install_gem = b.addInstallFileWithDir(gem_file, bin_dir, "gem");
+    step.dependOn(&install_gem.step);
+    if (chmod_cmd) |cc| {
+        cc.step.dependOn(&install_gem.step);
+        cc.addArg(b.getInstallPath(bin_dir, "gem"));
+    }
+
+    // bundle wrapper
+    const bundle_content = b.fmt(
+        \\#!{0s}
+        \\load File.expand_path('../lib/ruby/4.0.0/bin/bundle', __dir__)
+        \\
+    , .{b.getInstallPath(bin_dir, "ruby")});
+    const bundle_file = wrapper_wf.add("bundle", bundle_content);
+    const install_bundle = b.addInstallFileWithDir(bundle_file, bin_dir, "bundle");
+    step.dependOn(&install_bundle.step);
+    if (chmod_cmd) |cc| {
+        cc.step.dependOn(&install_bundle.step);
+        cc.addArg(b.getInstallPath(bin_dir, "bundle"));
+    }
+
+    // bundler wrapper
+    const bundler_content = b.fmt(
+        \\#!{0s}
+        \\load File.expand_path('../lib/ruby/4.0.0/bin/bundler', __dir__)
+        \\
+    , .{b.getInstallPath(bin_dir, "ruby")});
+    const bundler_file = wrapper_wf.add("bundler", bundler_content);
+    const install_bundler = b.addInstallFileWithDir(bundler_file, bin_dir, "bundler");
+    step.dependOn(&install_bundler.step);
+    if (chmod_cmd) |cc| {
+        cc.step.dependOn(&install_bundler.step);
+        cc.addArg(b.getInstallPath(bin_dir, "bundler"));
+    }
+}
+
+fn replaceAll(
+    b: *std.Build,
+    template: []const u8,
+    p1: []const u8, v1: []const u8,
+    p2: []const u8, v2: []const u8,
+    p3: []const u8, v3: []const u8,
+    p4: []const u8, v4: []const u8,
+    p5: []const u8, v5: []const u8,
+    p6: []const u8, v6: []const u8,
+) []const u8 {
+    var current = template;
+    const pairs = [_]struct { pat: []const u8, val: []const u8 }{
+        .{ .pat = p1, .val = v1 },
+        .{ .pat = p2, .val = v2 },
+        .{ .pat = p3, .val = v3 },
+        .{ .pat = p4, .val = v4 },
+        .{ .pat = p5, .val = v5 },
+        .{ .pat = p6, .val = v6 },
+    };
+    for (pairs) |p| {
+        const size = std.mem.replacementSize(u8, current, p.pat, p.val);
+        const buf = b.allocator.alloc(u8, size) catch unreachable;
+        _ = std.mem.replace(u8, current, p.pat, p.val, buf);
+        current = buf;
+    }
+    return current;
 }
