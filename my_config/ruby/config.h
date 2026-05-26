@@ -38,6 +38,9 @@
 #define HAVE_TERMIOS_H 1
 #define HAVE_SYS_IOCTL_H 1
 #define HAVE_FSYNC 1
+#define HAVE_READLINK 1
+#define HAVE_SYMLINK 1
+#define HAVE_LINK 1
 #define THREAD_IMPL_H "thread_pthread.h"
 #define THREAD_IMPL_SRC "thread_pthread.c"
 #ifdef __APPLE__
