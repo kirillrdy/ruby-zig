@@ -148,18 +148,27 @@ rb_free_loaded_builtin_table(void)
 int custom_dladdr(const void *addr, Dl_info *info) {
     int ret = dladdr(addr, info);
     if (ret && info && info->dli_fname) {
-        const char *p = strstr(info->dli_fname, "/.zig-cache/o/");
+        /* libruby may be loaded from the zig build cache rather than the
+         * installed zig-out/lib. Ruby derives its load-path prefix from this
+         * path, so rewrite ".zig-cache/o/<hash>/..." to "zig-out/lib/...".
+         * Match the marker without a leading slash so this works whether the
+         * loader reports an absolute path or a cwd-relative one (the latter
+         * happens when a relative RUNPATH entry resolves from the cwd). */
+        static const char marker[] = ".zig-cache/o/";
+        static const char replacement[] = "zig-out/lib";
+        const char *p = strstr(info->dli_fname, marker);
         if (p) {
             size_t prefix_len = p - info->dli_fname;
-            const char *hash_slash = strchr(p + 14, '/');
+            const char *hash_slash = strchr(p + sizeof(marker) - 1, '/');
             if (hash_slash) {
+                size_t repl_len = sizeof(replacement) - 1;
                 size_t suffix_len = strlen(hash_slash);
-                size_t new_len = prefix_len + 12 + suffix_len + 1; // 12 for "/zig-out/lib"
+                size_t new_len = prefix_len + repl_len + suffix_len + 1;
                 char *new_path = malloc(new_len);
                 if (new_path) {
                     memcpy(new_path, info->dli_fname, prefix_len);
-                    memcpy(new_path + prefix_len, "/zig-out/lib", 12);
-                    memcpy(new_path + prefix_len + 12, hash_slash, suffix_len);
+                    memcpy(new_path + prefix_len, replacement, repl_len);
+                    memcpy(new_path + prefix_len + repl_len, hash_slash, suffix_len);
                     new_path[new_len - 1] = '\0';
                     info->dli_fname = new_path;
                 }
