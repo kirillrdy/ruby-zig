@@ -10,6 +10,7 @@ const ruby_api_version = "4.0"; // RUBY_API_VERSION major.minor — used in RUBY
 
 const ruby_so_name = ruby_base_name ++ "-" ++ ruby_version; // "ruby-4.0.4"
 const ruby_version_name = ruby_base_name ++ "-" ++ ruby_api_version; // "ruby-4.0"
+const ruby_header_dir = ruby_base_name ++ "-" ++ ruby_lib_version; // "ruby-4.0.0"
 const ruby_lib_subdir = ruby_base_name ++ "/" ++ ruby_lib_version; // "ruby/4.0.0"
 const ruby_site_lib_subdir = ruby_base_name ++ "/site_" ++ ruby_base_name ++ "/" ++ ruby_lib_version;
 const ruby_vendor_lib_subdir = ruby_base_name ++ "/vendor_" ++ ruby_base_name ++ "/" ++ ruby_lib_version;
@@ -383,7 +384,9 @@ fn installRuby(
     // Create shared library symlink (not needed on Windows)
     if (!is_windows) {
         const ext = if (is_darwin) "dylib" else "so";
-        const symlink = b.addSystemCommand(&.{ "ln", "-sf", b.fmt("libruby-4.0.4.{s}", .{ext}), b.getInstallPath(lib_dir, b.fmt("libruby.{s}", .{ext})) });
+        const lib_symlink_name = b.fmt("lib{s}.{s}", .{ ruby_base_name, ext });
+        const lib_shared_name = b.fmt("lib{s}.{s}", .{ ruby_so_name, ext });
+        const symlink = b.addSystemCommand(&.{ "ln", "-sf", lib_shared_name, b.getInstallPath(lib_dir, lib_symlink_name) });
         symlink.step.dependOn(&install_lib.step);
         step.dependOn(&symlink.step);
     }
@@ -392,12 +395,12 @@ fn installRuby(
     const install_headers = b.addInstallDirectory(.{
         .source_dir = ruby_src.path(b, "include"),
         .install_dir = include_dir,
-        .install_subdir = "ruby-4.0.0",
+        .install_subdir = ruby_header_dir,
     });
     step.dependOn(&install_headers.step);
 
     // Install configuration header to include/ruby-4.0.0/<ruby_platform>/ruby/config.h
-    const config_dest_path = b.fmt("ruby-4.0.0/{s}/ruby/config.h", .{ruby_platform});
+    const config_dest_path = b.fmt("{s}/{s}/ruby/config.h", .{ ruby_header_dir, ruby_platform });
     const install_config = b.addInstallFileWithDir(
         b.path("my_config/ruby/config.h"),
         include_dir,
@@ -409,7 +412,7 @@ fn installRuby(
     const install_libs = b.addInstallDirectory(.{
         .source_dir = ruby_src.path(b, "lib"),
         .install_dir = lib_dir,
-        .install_subdir = "ruby/4.0.0",
+        .install_subdir = ruby_lib_subdir,
     });
     step.dependOn(&install_libs.step);
 
@@ -429,7 +432,7 @@ fn installRuby(
         const install_ext_libs = b.addInstallDirectory(.{
             .source_dir = ruby_src.path(b, ext_lib),
             .install_dir = lib_dir,
-            .install_subdir = "ruby/4.0.0",
+            .install_subdir = ruby_lib_subdir,
         });
         step.dependOn(&install_ext_libs.step);
     }
@@ -674,25 +677,25 @@ fn installRuby(
 
     // Install pkgconfig/ruby-4.0.pc
     const pc_content = b.fmt(
-        \\ruby_version=4.0.0
+        \\ruby_version={0s}
         \\prefix=${{pcfiledir}}/../..
         \\exec_prefix=${{prefix}}
         \\bindir=${{exec_prefix}}/bin
         \\libdir=${{exec_prefix}}/lib
         \\includedir=${{exec_prefix}}/include
-        \\arch={0s}
+        \\arch={1s}
         \\sitearch=${{arch}}
-        \\rubyarchhdrdir=${{includedir}}/ruby-${{ruby_version}}/${{arch}}
-        \\rubyhdrdir=${{includedir}}/ruby-${{ruby_version}}
+        \\rubyarchhdrdir=${{includedir}}/{2s}-${{ruby_version}}/${{arch}}
+        \\rubyhdrdir=${{includedir}}/{2s}-${{ruby_version}}
         \\
         \\Name: Ruby
         \\Description: Object Oriented Script Language
-        \\Version: 4.0.4
+        \\Version: {3s}
         \\URL: https://www.ruby-lang.org
         \\Cflags: -I${{rubyarchhdrdir}} -I${{rubyhdrdir}}
-        \\Libs: -L${{libdir}} -lruby-4.0.4 -lpthread -ldl
+        \\Libs: -L${{libdir}} -l{4s} -lpthread -ldl
         \\
-    , .{ruby_platform});
+    , .{ ruby_lib_version, ruby_platform, ruby_base_name, ruby_version, ruby_so_name });
 
     const pc_dir: std.Build.InstallDir = if (target_subdir) |sub|
         .{ .custom = b.fmt("{s}/lib/pkgconfig", .{sub}) }
@@ -700,8 +703,9 @@ fn installRuby(
         .{ .custom = "lib/pkgconfig" };
 
     const pc_wf = b.addWriteFiles();
-    const pc_file = pc_wf.add("ruby-4.0.pc", pc_content);
-    const install_pc = b.addInstallFileWithDir(pc_file, pc_dir, "ruby-4.0.pc");
+    const pc_filename = b.fmt("{s}-{s}.pc", .{ ruby_base_name, ruby_api_version });
+    const pc_file = pc_wf.add(pc_filename, pc_content);
+    const install_pc = b.addInstallFileWithDir(pc_file, pc_dir, pc_filename);
     step.dependOn(&install_pc.step);
 
     // Install wrapper scripts in bin/
@@ -728,9 +732,9 @@ fn installRuby(
     for (wrappers) |w| {
         const content = b.fmt(
             \\#!{0s}
-            \\load File.expand_path('../lib/ruby/4.0.0/bin/{1s}', __dir__)
+            \\load File.expand_path('../lib/{1s}/bin/{2s}', __dir__)
             \\
-        , .{ b.getInstallPath(bin_dir, "ruby"), w.exec });
+        , .{ b.getInstallPath(bin_dir, ruby_base_name), ruby_lib_subdir, w.exec });
         const file = wrapper_wf.add(w.name, content);
         const install_wrapper = b.addInstallFileWithDir(file, bin_dir, w.name);
         step.dependOn(&install_wrapper.step);
@@ -747,7 +751,7 @@ fn installRuby(
         \\require "rubygems/gem_runner"
         \\Gem::GemRunner.new.run ARGV.clone
         \\
-    , .{b.getInstallPath(bin_dir, "ruby")});
+    , .{b.getInstallPath(bin_dir, ruby_base_name)});
     const gem_file = wrapper_wf.add("gem", gem_content);
     const install_gem = b.addInstallFileWithDir(gem_file, bin_dir, "gem");
     step.dependOn(&install_gem.step);
@@ -759,9 +763,9 @@ fn installRuby(
     // bundle wrapper
     const bundle_content = b.fmt(
         \\#!{0s}
-        \\load File.expand_path('../lib/ruby/4.0.0/bin/bundle', __dir__)
+        \\load File.expand_path('../lib/{1s}/bin/bundle', __dir__)
         \\
-    , .{b.getInstallPath(bin_dir, "ruby")});
+    , .{ b.getInstallPath(bin_dir, ruby_base_name), ruby_lib_subdir });
     const bundle_file = wrapper_wf.add("bundle", bundle_content);
     const install_bundle = b.addInstallFileWithDir(bundle_file, bin_dir, "bundle");
     step.dependOn(&install_bundle.step);
@@ -773,9 +777,9 @@ fn installRuby(
     // bundler wrapper
     const bundler_content = b.fmt(
         \\#!{0s}
-        \\load File.expand_path('../lib/ruby/4.0.0/bin/bundler', __dir__)
+        \\load File.expand_path('../lib/{1s}/bin/bundler', __dir__)
         \\
-    , .{b.getInstallPath(bin_dir, "ruby")});
+    , .{ b.getInstallPath(bin_dir, ruby_base_name), ruby_lib_subdir });
     const bundler_file = wrapper_wf.add("bundler", bundler_content);
     const install_bundler = b.addInstallFileWithDir(bundler_file, bin_dir, "bundler");
     step.dependOn(&install_bundler.step);
