@@ -23,7 +23,7 @@ pub fn build(b: *std.Build) void {
     const macos_sdk = fetchMacosSdk(b);
 
     const ruby_build = buildRuby(b, target, optimize, ruby_src, macos_sdk);
-    installRuby(b, b.getInstallStep(), ruby_build.exe, ruby_build.lib, null, ruby_src, ruby_build.platform, target);
+    installRuby(b, b.getInstallStep(), ruby_build, null, ruby_src, target);
 
     const all_step = b.step("all", "Build Ruby for macOS, Linux, and Windows");
     const all_targets = [_]struct { query: std.Target.Query, install_dir: []const u8 }{
@@ -34,7 +34,7 @@ pub fn build(b: *std.Build) void {
     for (all_targets) |target_spec| {
         const resolved_target = b.resolveTargetQuery(target_spec.query);
         const target_build = buildRuby(b, resolved_target, optimize, ruby_src, macos_sdk);
-        installRuby(b, all_step, target_build.exe, target_build.lib, target_spec.install_dir, ruby_src, target_build.platform, resolved_target);
+        installRuby(b, all_step, target_build, target_spec.install_dir, ruby_src, resolved_target);
     }
 }
 
@@ -89,10 +89,8 @@ fn buildRuby(
     else
         "x86_64-linux";
 
-    const coroutine_h = if (target.result.cpu.arch == .aarch64)
-        "coroutine/arm64/Context.h"
-    else
-        "coroutine/amd64/Context.h";
+    const coroutine_arch = if (target.result.cpu.arch == .aarch64) "arm64" else "amd64";
+    const coroutine_h = b.fmt("coroutine/{s}/Context.h", .{coroutine_arch});
 
     const lib = b.addLibrary(.{
         .name = ruby_so_name,
@@ -134,35 +132,30 @@ fn buildRuby(
     _ = verconf_wf.add("verconf.h", verconf_content);
 
     lib.root_module.addIncludePath(verconf_wf.getDirectory());
-    lib.root_module.addIncludePath(b.path("my_config"));
-    lib.root_module.addIncludePath(b.path("my_config/ruby"));
-    lib.root_module.addIncludePath(ruby_src.path(b, "include"));
-    lib.root_module.addIncludePath(ruby_src.path(b, "."));
+    addBasePaths(b, lib.root_module, ruby_src, macos_sdk, is_darwin);
     lib.root_module.addIncludePath(ruby_src.path(b, "prism"));
     lib.root_module.addIncludePath(ruby_src.path(b, "enc/unicode/17.0.0"));
-    lib.root_module.addIncludePath(b.path("shims"));
     lib.root_module.addIncludePath(ruby_src.path(b, "ext/etc"));
     lib.root_module.addIncludePath(ruby_src.path(b, "ext/date"));
     lib.root_module.addIncludePath(ruby_src.path(b, "ext/ripper"));
     lib.root_module.addIncludePath(ruby_src.path(b, "ext/io/console"));
 
-    if (is_darwin) {
-        lib.root_module.addSystemIncludePath(macos_sdk.path(b, "usr/include"));
-        lib.root_module.addFrameworkPath(macos_sdk.path(b, "System/Library/Frameworks"));
-        lib.root_module.addLibraryPath(macos_sdk.path(b, "usr/lib"));
-    }
-
     const common_sources = &[_][]const u8{
-        "array.c", "ast.c", "bignum.c", "class.c", "compar.c", "compile.c", "complex.c", "cont.c", "debug.c", "debug_counter.c", "dir.c", "dln_find.c", "encoding.c", "enum.c", "enumerator.c", "error.c", "eval.c", "file.c", "gc.c", "hash.c", "inits.c", "imemo.c", "io.c", "io_buffer.c", "iseq.c", "load.c", "marshal.c", "math.c", "memory_view.c", "concurrent_set.c", "box.c", "node.c", "node_dump.c", "numeric.c", "object.c", "pack.c", "parse.c", "parser_st.c", "proc.c", "process.c", "ractor.c", "random.c", "range.c", "rational.c", "re.c", "regcomp.c", "regenc.c", "regerror.c", "regexec.c", "regparse.c", "regsyntax.c", "ruby.c", "ruby_parser.c", "scheduler.c", "shape.c", "signal.c", "sprintf.c", "st.c", "strftime.c", "string.c", "struct.c", "symbol.c", "thread.c", "time.c", "transcode.c", "util.c", "variable.c", "version.c", "vm.c", "vm_backtrace.c", "vm_dump.c", "vm_sync.c", "vm_trace.c", "weakmap.c", "loadpath.c", "dmydln.c", "set.c", "pathname.c",
+        // Core
+        "array.c",         "ast.c",                    "bignum.c",               "class.c",     "compar.c",       "compile.c",   "complex.c",     "cont.c",              "debug.c",               "debug_counter.c", "dir.c",                   "dln_find.c",            "encoding.c",        "enum.c",               "enumerator.c",          "error.c",                  "eval.c",                   "file.c",                   "gc.c",               "hash.c",                     "inits.c",          "imemo.c",          "io.c",               "io_buffer.c",      "iseq.c",            "load.c",       "marshal.c",       "math.c",       "memory_view.c",       "concurrent_set.c", "box.c",             "node.c",                  "node_dump.c",        "numeric.c",              "object.c",             "pack.c",                        "parse.c",                 "parser_st.c",          "proc.c",                 "process.c",                    "ractor.c",               "random.c",                    "range.c",                 "rational.c",    "re.c",         "regcomp.c", "regenc.c", "regerror.c", "regexec.c", "regparse.c", "regsyntax.c", "ruby.c", "ruby_parser.c", "scheduler.c", "shape.c", "signal.c", "sprintf.c", "st.c", "strftime.c", "string.c", "struct.c", "symbol.c", "thread.c", "time.c", "transcode.c", "util.c", "variable.c", "version.c", "vm.c", "vm_backtrace.c", "vm_dump.c", "vm_sync.c", "vm_trace.c", "weakmap.c", "loadpath.c", "dmydln.c", "set.c", "pathname.c",
+        // Missing/Enc
+        "missing/crypt.c", "missing/explicit_bzero.c", "missing/setproctitle.c", "enc/ascii.c", "enc/us_ascii.c", "enc/utf_8.c", "enc/unicode.c", "enc/trans/newline.c",
+        // Core extensions
+        "ext/monitor/monitor.c", "ext/etc/etc.c",   "ext/stringio/stringio.c", "ext/strscan/strscan.c", "ext/fcntl/fcntl.c", "ext/date/date_core.c", "ext/date/date_parse.c", "ext/date/date_strftime.c", "ext/date/date_strptime.c", "ext/io/console/console.c", "ext/io/wait/wait.c", "ext/io/nonblock/nonblock.c",
+        // Prism
+        "prism/api_node.c", "prism/api_pack.c", "prism/diagnostic.c", "prism/encoding.c", "prism/extension.c", "prism/node.c", "prism/options.c", "prism/pack.c", "prism/prettyprint.c", "prism/regexp.c",   "prism/serialize.c", "prism/static_literals.c", "prism/token_type.c", "prism/util/pm_buffer.c", "prism/util/pm_char.c", "prism/util/pm_constant_pool.c", "prism/util/pm_integer.c", "prism/util/pm_list.c", "prism/util/pm_memchr.c", "prism/util/pm_newline_list.c", "prism/util/pm_string.c", "prism/util/pm_strncasecmp.c", "prism/util/pm_strpbrk.c", "prism/prism.c", "prism_init.c",
     };
 
     const base_flags = &[_][]const u8{
         "-D_REENTRANT",                       "-std=gnu11",              "-fcommon",
-        "-DTRIGGER_REBUILD=7",
         "-Wno-implicit-function-declaration", "-Wno-int-conversion",     "-Wno-incompatible-pointer-types",
         "-Wno-error=invalid-constexpr",       "-fno-sanitize=undefined", "-Wno-error",
-        "-Wno-deprecated-declarations",
-        "-DUSE_ZJIT=0",                       "-DUSE_JIT=0",
+        "-Wno-deprecated-declarations",       "-DUSE_ZJIT=0",            "-DUSE_JIT=0",
     };
 
     const darwin_flags = base_flags ++ &[_][]const u8{
@@ -197,79 +190,32 @@ fn buildRuby(
         .flags = common_flags,
     });
 
-    // Missing/Enc sources from dependency
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/crypt.c"), .flags = common_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/explicit_bzero.c"), .flags = common_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/setproctitle.c"), .flags = common_flags });
     if (!is_darwin) {
-        lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/strlcpy.c"), .flags = common_flags });
-        lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "missing/strlcat.c"), .flags = common_flags });
+        lib.root_module.addCSourceFiles(.{
+            .root = ruby_src,
+            .files = &.{ "missing/strlcpy.c", "missing/strlcat.c" },
+            .flags = common_flags,
+        });
     }
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/ascii.c"), .flags = common_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/us_ascii.c"), .flags = common_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/utf_8.c"), .flags = common_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/unicode.c"), .flags = common_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "enc/trans/newline.c"), .flags = common_flags });
 
-    // Extension C source files
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/monitor/monitor.c"), .flags = common_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/etc/etc.c"), .flags = common_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/stringio/stringio.c"), .flags = common_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/strscan/strscan.c"), .flags = common_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/fcntl/fcntl.c"), .flags = common_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/date/date_core.c"), .flags = common_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/date/date_parse.c"), .flags = common_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/date/date_strftime.c"), .flags = common_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/date/date_strptime.c"), .flags = common_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/io/console/console.c"), .flags = common_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/io/wait/wait.c"), .flags = common_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/io/nonblock/nonblock.c"), .flags = common_flags });
-
-    const ripper_flags = b.allocator.alloc([]const u8, common_flags.len + 1) catch unreachable;
-    @memcpy(ripper_flags[0..common_flags.len], common_flags);
-    ripper_flags[common_flags.len] = "-DRIPPER";
-
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/ripper/ripper.c"), .flags = ripper_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/ripper/ripper_init.c"), .flags = ripper_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/ripper/eventids1.c"), .flags = ripper_flags });
-    lib.root_module.addCSourceFile(.{ .file = ruby_src.path(b, "ext/ripper/eventids2.c"), .flags = ripper_flags });
-
-    const prism_sources = &[_][]const u8{
-        "prism/api_node.c", "prism/api_pack.c", "prism/diagnostic.c", "prism/encoding.c", "prism/extension.c", "prism/node.c", "prism/options.c", "prism/pack.c", "prism/prettyprint.c", "prism/regexp.c", "prism/serialize.c", "prism/static_literals.c", "prism/token_type.c", "prism/util/pm_buffer.c", "prism/util/pm_char.c", "prism/util/pm_constant_pool.c", "prism/util/pm_integer.c", "prism/util/pm_list.c", "prism/util/pm_memchr.c", "prism/util/pm_newline_list.c", "prism/util/pm_string.c", "prism/util/pm_strncasecmp.c", "prism/util/pm_strpbrk.c", "prism/prism.c", "prism_init.c",
-    };
+    const ripper_flags = std.mem.concat(b.allocator, []const u8, &.{
+        common_flags, &.{"-DRIPPER"},
+    }) catch unreachable;
 
     lib.root_module.addCSourceFiles(.{
         .root = ruby_src,
-        .files = prism_sources,
-        .flags = common_flags,
+        .files = &.{ "ext/ripper/ripper.c", "ext/ripper/ripper_init.c", "ext/ripper/eventids1.c", "ext/ripper/eventids2.c" },
+        .flags = ripper_flags,
     });
 
-    // Handle coroutine
-    if (target.result.cpu.arch == .aarch64) {
-        if (is_darwin) {
-            lib.root_module.addCSourceFile(.{
-                .file = ruby_src.path(b, "coroutine/arm64/Context.S"),
-                .flags = &[_][]const u8{"-DPREFIXED_SYMBOL(name)=_##name"},
-            });
-        } else {
-            lib.root_module.addCSourceFile(.{
-                .file = ruby_src.path(b, "coroutine/arm64/Context.S"),
-                .flags = &[_][]const u8{"-DPREFIXED_SYMBOL(name)=name"},
-            });
-        }
-    } else if (target.result.cpu.arch == .x86_64) {
-        if (is_darwin) {
-            lib.root_module.addCSourceFile(.{
-                .file = ruby_src.path(b, "coroutine/amd64/Context.S"),
-                .flags = &[_][]const u8{"-DPREFIXED_SYMBOL(name)=_##name"},
-            });
-        } else {
-            lib.root_module.addCSourceFile(.{
-                .file = ruby_src.path(b, "coroutine/amd64/Context.S"),
-                .flags = &[_][]const u8{"-DPREFIXED_SYMBOL(name)=name"},
-            });
-        }
-    }
+    // Darwin's assembler mangles C symbols with a leading underscore.
+    lib.root_module.addCSourceFile(.{
+        .file = ruby_src.path(b, b.fmt("coroutine/{s}/Context.S", .{coroutine_arch})),
+        .flags = if (is_darwin)
+            &[_][]const u8{"-DPREFIXED_SYMBOL(name)=_##name"}
+        else
+            &[_][]const u8{"-DPREFIXED_SYMBOL(name)=name"},
+    });
 
     if (is_darwin) {
         lib.root_module.linkFramework("CoreFoundation", .{});
@@ -318,17 +264,7 @@ fn buildRuby(
         });
     }
 
-    exe.root_module.addIncludePath(b.path("my_config"));
-    exe.root_module.addIncludePath(b.path("my_config/ruby"));
-    exe.root_module.addIncludePath(ruby_src.path(b, "include"));
-    exe.root_module.addIncludePath(ruby_src.path(b, "."));
-    exe.root_module.addIncludePath(b.path("shims"));
-
-    if (is_darwin) {
-        exe.root_module.addSystemIncludePath(macos_sdk.path(b, "usr/include"));
-        exe.root_module.addFrameworkPath(macos_sdk.path(b, "System/Library/Frameworks"));
-        exe.root_module.addLibraryPath(macos_sdk.path(b, "usr/lib"));
-    }
+    addBasePaths(b, exe.root_module, ruby_src, macos_sdk, is_darwin);
 
     exe.root_module.linkLibrary(lib);
 
@@ -341,42 +277,63 @@ fn buildRuby(
     return .{ .exe = exe, .lib = lib, .platform = ruby_platform };
 }
 
+// Include and SDK search paths shared by the library and executable modules.
+fn addBasePaths(
+    b: *std.Build,
+    module: *std.Build.Module,
+    ruby_src: std.Build.LazyPath,
+    macos_sdk: std.Build.LazyPath,
+    is_darwin: bool,
+) void {
+    module.addIncludePath(b.path("my_config"));
+    module.addIncludePath(b.path("my_config/ruby"));
+    module.addIncludePath(ruby_src.path(b, "include"));
+    module.addIncludePath(ruby_src.path(b, "."));
+    module.addIncludePath(b.path("shims"));
+
+    if (is_darwin) {
+        module.addSystemIncludePath(macos_sdk.path(b, "usr/include"));
+        module.addFrameworkPath(macos_sdk.path(b, "System/Library/Frameworks"));
+        module.addLibraryPath(macos_sdk.path(b, "usr/lib"));
+    }
+}
+
+// Maps an install subpath into target_subdir when cross-installing (the "all"
+// step), otherwise into `default` (or `subpath` itself when default is null).
+fn installDir(
+    b: *std.Build,
+    target_subdir: ?[]const u8,
+    subpath: []const u8,
+    default: ?std.Build.InstallDir,
+) std.Build.InstallDir {
+    if (target_subdir) |sub| return .{ .custom = b.fmt("{s}/{s}", .{ sub, subpath }) };
+    return default orelse .{ .custom = subpath };
+}
+
 fn installRuby(
     b: *std.Build,
     step: *std.Build.Step,
-    exe: *std.Build.Step.Compile,
-    lib: *std.Build.Step.Compile,
+    ruby: RubyBuild,
     target_subdir: ?[]const u8,
     ruby_src: std.Build.LazyPath,
-    ruby_platform: []const u8,
     target: std.Build.ResolvedTarget,
 ) void {
     const is_darwin = target.result.os.tag == .macos;
     const is_windows = target.result.os.tag == .windows;
+    const ruby_platform = ruby.platform;
 
-    const bin_dir: std.Build.InstallDir = if (target_subdir) |sub|
-        .{ .custom = b.fmt("{s}/bin", .{sub}) }
-    else
-        .bin;
-
-    const lib_dir: std.Build.InstallDir = if (target_subdir) |sub|
-        .{ .custom = b.fmt("{s}/lib", .{sub}) }
-    else
-        .lib;
-
-    const include_dir: std.Build.InstallDir = if (target_subdir) |sub|
-        .{ .custom = b.fmt("{s}/include", .{sub}) }
-    else
-        .header;
+    const bin_dir = installDir(b, target_subdir, "bin", .bin);
+    const lib_dir = installDir(b, target_subdir, "lib", .lib);
+    const include_dir = installDir(b, target_subdir, "include", .header);
 
     // Install executable
-    const install_exe = b.addInstallArtifact(exe, .{
+    const install_exe = b.addInstallArtifact(ruby.exe, .{
         .dest_dir = .{ .override = bin_dir },
     });
     step.dependOn(&install_exe.step);
 
     // Install shared library
-    const install_lib = b.addInstallArtifact(lib, .{
+    const install_lib = b.addInstallArtifact(ruby.lib, .{
         .dest_dir = .{ .override = lib_dir },
     });
     step.dependOn(&install_lib.step);
@@ -634,10 +591,7 @@ fn installRuby(
         \\
     , .{ ruby_base_name, ruby_lib_version, ruby_site_lib_subdir, ruby_platform });
 
-    const hook_dir: std.Build.InstallDir = if (target_subdir) |sub|
-        .{ .custom = b.fmt("{s}/nix-support", .{sub}) }
-    else
-        .{ .custom = "nix-support" };
+    const hook_dir = installDir(b, target_subdir, "nix-support", null);
 
     const hook_wf = b.addWriteFiles();
     const hook_file = hook_wf.add("setup-hook", resolved_hook_content);
@@ -648,32 +602,15 @@ fn installRuby(
     const keep_wf = b.addWriteFiles();
     const keep_file = keep_wf.add(".keep", "");
 
-    const gems_subdir = b.fmt("lib/{s}/gems/{s}", .{ ruby_base_name, ruby_lib_version });
-    const site_subdir = b.fmt("lib/{s}", .{ruby_site_lib_subdir});
-    const vendor_subdir = b.fmt("lib/{s}", .{ruby_vendor_lib_subdir});
-
-    const gems_dir: std.Build.InstallDir = if (target_subdir) |sub|
-        .{ .custom = b.fmt("{s}/{s}", .{ sub, gems_subdir }) }
-    else
-        .{ .custom = gems_subdir };
-
-    const site_dir: std.Build.InstallDir = if (target_subdir) |sub|
-        .{ .custom = b.fmt("{s}/{s}", .{ sub, site_subdir }) }
-    else
-        .{ .custom = site_subdir };
-
-    const vendor_dir: std.Build.InstallDir = if (target_subdir) |sub|
-        .{ .custom = b.fmt("{s}/{s}", .{ sub, vendor_subdir }) }
-    else
-        .{ .custom = vendor_subdir };
-
-    const install_gems_keep = b.addInstallFileWithDir(keep_file, gems_dir, ".keep");
-    const install_site_keep = b.addInstallFileWithDir(keep_file, site_dir, ".keep");
-    const install_vendor_keep = b.addInstallFileWithDir(keep_file, vendor_dir, ".keep");
-
-    step.dependOn(&install_gems_keep.step);
-    step.dependOn(&install_site_keep.step);
-    step.dependOn(&install_vendor_keep.step);
+    const keep_subdirs = [_][]const u8{
+        b.fmt("lib/{s}/gems/{s}", .{ ruby_base_name, ruby_lib_version }),
+        "lib/" ++ ruby_site_lib_subdir,
+        "lib/" ++ ruby_vendor_lib_subdir,
+    };
+    for (keep_subdirs) |subdir| {
+        const install_keep = b.addInstallFileWithDir(keep_file, installDir(b, target_subdir, subdir, null), ".keep");
+        step.dependOn(&install_keep.step);
+    }
 
     // Install pkgconfig/ruby-4.0.pc
     const pc_content = b.fmt(
@@ -697,10 +634,7 @@ fn installRuby(
         \\
     , .{ ruby_lib_version, ruby_platform, ruby_base_name, ruby_version, ruby_so_name });
 
-    const pc_dir: std.Build.InstallDir = if (target_subdir) |sub|
-        .{ .custom = b.fmt("{s}/lib/pkgconfig", .{sub}) }
-    else
-        .{ .custom = "lib/pkgconfig" };
+    const pc_dir = installDir(b, target_subdir, "lib/pkgconfig", null);
 
     const pc_wf = b.addWriteFiles();
     const pc_filename = b.fmt("{s}-{s}.pc", .{ ruby_base_name, ruby_api_version });
@@ -708,84 +642,55 @@ fn installRuby(
     const install_pc = b.addInstallFileWithDir(pc_file, pc_dir, pc_filename);
     step.dependOn(&install_pc.step);
 
-    // Install wrapper scripts in bin/
-    const wrappers = [_]struct { name: []const u8, gem: []const u8, exec: []const u8 }{
-        .{ .name = "irb", .gem = "irb", .exec = "irb" },
-        .{ .name = "erb", .gem = "erb", .exec = "erb" },
-        .{ .name = "ri", .gem = "rdoc", .exec = "ri" },
-        .{ .name = "rdoc", .gem = "rdoc", .exec = "rdoc" },
-        .{ .name = "rake", .gem = "rake", .exec = "rake" },
-        .{ .name = "racc", .gem = "racc", .exec = "racc" },
-        .{ .name = "rbs", .gem = "rbs", .exec = "rbs" },
-        .{ .name = "rdbg", .gem = "debug", .exec = "rdbg" },
-        .{ .name = "syntax_suggest", .gem = "syntax_suggest", .exec = "syntax_suggest" },
-        .{ .name = "typeprof", .gem = "typeprof", .exec = "typeprof" },
-    };
+    // Install wrapper scripts in bin/. Each loads the same-named script
+    // installed under lib/ruby/<ver>/bin by the gem-unpacking step above.
+    const ruby_exe_path = b.getInstallPath(bin_dir, ruby_base_name);
 
     const wrapper_wf = b.addWriteFiles();
     var chmod_cmd: ?*std.Build.Step.Run = null;
     if (!is_windows) {
-        chmod_cmd = b.addSystemCommand(&.{"chmod", "+x"});
+        chmod_cmd = b.addSystemCommand(&.{ "chmod", "+x" });
         step.dependOn(&chmod_cmd.?.step);
     }
 
-    for (wrappers) |w| {
+    const wrappers = [_][]const u8{
+        "irb", "erb", "ri", "rdoc", "rake", "racc", "rbs", "rdbg", "syntax_suggest", "typeprof", "bundle", "bundler",
+    };
+    for (wrappers) |name| {
         const content = b.fmt(
             \\#!{0s}
             \\load File.expand_path('../lib/{1s}/bin/{2s}', __dir__)
             \\
-        , .{ b.getInstallPath(bin_dir, ruby_base_name), ruby_lib_subdir, w.exec });
-        const file = wrapper_wf.add(w.name, content);
-        const install_wrapper = b.addInstallFileWithDir(file, bin_dir, w.name);
-        step.dependOn(&install_wrapper.step);
-        if (chmod_cmd) |cc| {
-            cc.step.dependOn(&install_wrapper.step);
-            cc.addArg(b.getInstallPath(bin_dir, w.name));
-        }
+        , .{ ruby_exe_path, ruby_lib_subdir, name });
+        installBinScript(b, step, wrapper_wf, bin_dir, chmod_cmd, name, content);
     }
 
-    // gem wrapper
+    // gem has no script under lib/ruby/<ver>/bin; invoke RubyGems directly.
     const gem_content = b.fmt(
         \\#!{s}
         \\# frozen_string_literal: true
         \\require "rubygems/gem_runner"
         \\Gem::GemRunner.new.run ARGV.clone
         \\
-    , .{b.getInstallPath(bin_dir, ruby_base_name)});
-    const gem_file = wrapper_wf.add("gem", gem_content);
-    const install_gem = b.addInstallFileWithDir(gem_file, bin_dir, "gem");
-    step.dependOn(&install_gem.step);
-    if (chmod_cmd) |cc| {
-        cc.step.dependOn(&install_gem.step);
-        cc.addArg(b.getInstallPath(bin_dir, "gem"));
-    }
+    , .{ruby_exe_path});
+    installBinScript(b, step, wrapper_wf, bin_dir, chmod_cmd, "gem", gem_content);
+}
 
-    // bundle wrapper
-    const bundle_content = b.fmt(
-        \\#!{0s}
-        \\load File.expand_path('../lib/{1s}/bin/bundle', __dir__)
-        \\
-    , .{ b.getInstallPath(bin_dir, ruby_base_name), ruby_lib_subdir });
-    const bundle_file = wrapper_wf.add("bundle", bundle_content);
-    const install_bundle = b.addInstallFileWithDir(bundle_file, bin_dir, "bundle");
-    step.dependOn(&install_bundle.step);
+fn installBinScript(
+    b: *std.Build,
+    step: *std.Build.Step,
+    wf: *std.Build.Step.WriteFile,
+    bin_dir: std.Build.InstallDir,
+    chmod_cmd: ?*std.Build.Step.Run,
+    name: []const u8,
+    content: []const u8,
+) void {
+    const file = wf.add(name, content);
+    const install = b.addInstallFileWithDir(file, bin_dir, name);
+    step.dependOn(&install.step);
     if (chmod_cmd) |cc| {
-        cc.step.dependOn(&install_bundle.step);
-        cc.addArg(b.getInstallPath(bin_dir, "bundle"));
-    }
-
-    // bundler wrapper
-    const bundler_content = b.fmt(
-        \\#!{0s}
-        \\load File.expand_path('../lib/{1s}/bin/bundler', __dir__)
-        \\
-    , .{ b.getInstallPath(bin_dir, ruby_base_name), ruby_lib_subdir });
-    const bundler_file = wrapper_wf.add("bundler", bundler_content);
-    const install_bundler = b.addInstallFileWithDir(bundler_file, bin_dir, "bundler");
-    step.dependOn(&install_bundler.step);
-    if (chmod_cmd) |cc| {
-        cc.step.dependOn(&install_bundler.step);
-        cc.addArg(b.getInstallPath(bin_dir, "bundler"));
+        cc.step.dependOn(&install.step);
+        cc.addArg(b.getInstallPath(bin_dir, name));
     }
 }
 
