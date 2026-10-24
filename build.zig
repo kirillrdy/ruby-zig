@@ -310,6 +310,16 @@ fn installDir(
     return default orelse .{ .custom = subpath };
 }
 
+// Install locations are resolved by the build runner, after configuration.
+fn installPath(b: *std.Build, dir: std.Build.InstallDir, sub_path: []const u8) std.Build.LazyPath {
+    return b.graph.path(switch (dir) {
+        .prefix, .custom => .install_prefix,
+        .lib => .install_lib,
+        .bin => .install_bin,
+        .header => .install_include,
+    }, if (dir == .custom) b.pathJoin(&.{ dir.custom, sub_path }) else sub_path);
+}
+
 fn installRuby(
     b: *std.Build,
     step: *std.Build.Step,
@@ -343,7 +353,8 @@ fn installRuby(
         const ext = if (is_darwin) "dylib" else "so";
         const lib_symlink_name = b.fmt("lib{s}.{s}", .{ ruby_base_name, ext });
         const lib_shared_name = b.fmt("lib{s}.{s}", .{ ruby_so_name, ext });
-        const symlink = b.addSystemCommand(&.{ "ln", "-sf", lib_shared_name, b.getInstallPath(lib_dir, lib_symlink_name) });
+        const symlink = b.addSystemCommand(&.{ "ln", "-sf", lib_shared_name });
+        symlink.addFileArg(installPath(b, lib_dir, lib_symlink_name));
         symlink.step.dependOn(&install_lib.step);
         step.dependOn(&symlink.step);
     }
@@ -435,7 +446,7 @@ fn installRuby(
     install_gems_cmd.addFileArg(ruby_src.path(b, "gems"));
     install_gems_cmd.addFileArg(ruby_src.path(b, "libexec"));
     install_gems_cmd.addFileArg(ruby_src.path(b, "bin"));
-    install_gems_cmd.addArg(b.getInstallPath(lib_dir, ruby_lib_subdir));
+    install_gems_cmd.addDirectoryArg(installPath(b, lib_dir, ruby_lib_subdir));
     install_gems_cmd.step.dependOn(&install_libs.step);
     step.dependOn(&install_gems_cmd.step);
 
@@ -644,9 +655,8 @@ fn installRuby(
 
     // Install wrapper scripts in bin/. Each loads the same-named script
     // installed under lib/ruby/<ver>/bin by the gem-unpacking step above.
-    const ruby_exe_path = b.getInstallPath(bin_dir, ruby_base_name);
+    const ruby_exe_path = installPath(b, bin_dir, ruby_base_name);
 
-    const wrapper_wf = b.addWriteFiles();
     var chmod_cmd: ?*std.Build.Step.Run = null;
     if (!is_windows) {
         chmod_cmd = b.addSystemCommand(&.{ "chmod", "+x" });
@@ -658,39 +668,43 @@ fn installRuby(
     };
     for (wrappers) |name| {
         const content = b.fmt(
-            \\#!{0s}
-            \\load File.expand_path('../lib/{1s}/bin/{2s}', __dir__)
+            \\load File.expand_path('../lib/{0s}/bin/{1s}', __dir__)
             \\
-        , .{ ruby_exe_path, ruby_lib_subdir, name });
-        installBinScript(b, step, wrapper_wf, bin_dir, chmod_cmd, name, content);
+        , .{ ruby_lib_subdir, name });
+        installBinScript(b, step, &install_exe.step, ruby_exe_path, bin_dir, chmod_cmd, name, content);
     }
 
     // gem has no script under lib/ruby/<ver>/bin; invoke RubyGems directly.
-    const gem_content = b.fmt(
-        \\#!{s}
+    const gem_content =
         \\# frozen_string_literal: true
         \\require "rubygems/gem_runner"
         \\Gem::GemRunner.new.run ARGV.clone
         \\
-    , .{ruby_exe_path});
-    installBinScript(b, step, wrapper_wf, bin_dir, chmod_cmd, "gem", gem_content);
+    ;
+    installBinScript(b, step, &install_exe.step, ruby_exe_path, bin_dir, chmod_cmd, "gem", gem_content);
 }
 
 fn installBinScript(
     b: *std.Build,
     step: *std.Build.Step,
-    wf: *std.Build.Step.WriteFile,
+    install_exe_step: *std.Build.Step,
+    ruby_exe_path: std.Build.LazyPath,
     bin_dir: std.Build.InstallDir,
     chmod_cmd: ?*std.Build.Step.Run,
     name: []const u8,
     content: []const u8,
 ) void {
-    const file = wf.add(name, content);
+    // Resolve the shebang at execution time, when the install prefix is known.
+    const script = b.addSystemCommand(&.{ "sh", "-c", "printf '#!%s\\n%s' \"$1\" \"$2\" > \"$3\"", "sh" });
+    script.step.dependOn(install_exe_step);
+    script.addFileArg2(ruby_exe_path, .{ .make_absolute = true });
+    script.addArg(content);
+    const file = script.addOutputFileArg(name);
     const install = b.addInstallFileWithDir(file, bin_dir, name);
     step.dependOn(&install.step);
     if (chmod_cmd) |cc| {
         cc.step.dependOn(&install.step);
-        cc.addArg(b.getInstallPath(bin_dir, name));
+        cc.addFileArg(installPath(b, bin_dir, name));
     }
 }
 
